@@ -1,0 +1,132 @@
+// Programa   : ADDFIELDS_2002
+// Fecha/Hora : 08/09/2019 11:03:42
+// Propósito  : Agregar Campos en Release 20_01
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN()
+  LOCAL cId   :="ADDFIELD2002_43",oData,cWhere,cSql,I
+  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+  LOCAL oFrm
+  LOCAL aFields:={}
+
+  oData:=DATASET(cId,"ALL")
+
+  IF oData:Get(cId,"")<>cId 
+     oData:End()
+  ELSE
+     oData:End()
+     RETURN
+  ENDIF
+
+  IF oDp:lCrearTablas .OR. Empty(oDb:GetTables())
+     oData:=DATASET(cId,"ALL")
+     oData:Set(cId,cId)
+     oData:Save()
+     oData:End()
+     RETURN .T.
+  ENDIF
+
+  oFrm:=MSGRUNVIEW("Actualizando Base de Datos R:20.02")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLI"   ,"TDC_EDICOL","L",01,0,"Columnas Editables")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPDOCCLI"      ,"DOC_FCHREC","D",08,0,"Fecha Recepción del Producto")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCLIENTES"    ,"CLI_CLRGRA","N",10,0,"Color Gráficas")
+
+
+  EJECUTAR("DPCAMPOSADD" ,"DPRECIBOSCLI"  ,"REC_MTODIF","N",20,2,"Diferencia de Pago")
+  EJECUTAR("DPCAMPOSADD" ,"DPRECIBOSCLI"  ,"REC_DIFCAM","N",20,2,"Diferencia Cambiario")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTABMON"      ,"MON_CODPRC","C",20 ,2,"Código de Proceso Automático")
+  EJECUTAR("DPCAMPOSADD" ,"DPTABMON"      ,"MON_URL"   ,"C",250,2,"Dirección URL")
+
+  SQLUPDATE("DPTABMON","MON_CODPRC","DPHISTABMOBBCV","MON_CODIGO"+GetWhere("=","DBC"))
+  SQLUPDATE("DPTABMON","MON_URL"   ,"https://www.bcv.org.ve/","MON_CODIGO"+GetWhere("=","DBC"))
+
+
+  SQLUPDATE("DPTABMON","MON_CODPRC","DPHISTABMOBDMON","MON_CODIGO"+GetWhere("=","DMN"))
+  SQLUPDATE("DPTABMON","MON_URL"   ,"https://twitter.com/monitordolarvla?lang=es","MON_CODIGO"+GetWhere("=","DMN"))
+
+
+  EJECUTAR("DPCAMPOSOPCADD","DPDOCCLI"   ,"DOC_ESTADO","Obsequio" ,.T.)
+  EJECUTAR("DPCAMPOSOPCADD","DPDOCCLI"   ,"DOC_ESTADO","Facturado",.T.)
+  EJECUTAR("DPCAMPOSOPCADD","DPDOCCLI"   ,"DOC_ESTADO","Recibido",.T.)
+  EJECUTAR("DPCAMPOSOPCADD","DPTIPDOCCLI","TDC_EXIVAL","Neutra"  ,.T.)
+
+
+  EJECUTAR("DPCAMPOSOPCADD","DPPROCESOS","PRC_CLASIF","Producción"   ,.T.)
+
+  EJECUTAR("DPCAMPOSADD"   ,"DPTIPDOCCLI","TDC_PRECIO","L",001,0,"Precio Dinámico en Divisas"        ,NIL,.T.,.F.,".F.")    // Precio de Venta en Divisas
+  EJECUTAR("DPCAMPOSADD"   ,"DPBALANZA"  ,"BAL_PC2"   ,"C",030,0,"2Da Balanza")
+  EJECUTAR("DPCAMPOSADD"   ,"DPBALANZA"  ,"BAL_MODELO","C",020,0,"2Da Balanza")
+
+  EJECUTAR("DPCAMPOSOPCADD","DPBALANZA"  ,"BAL_MODELO","BASIX",.T.)
+
+
+  SQLUPDATE("DPDOCCLI","DOC_ESTADO","F","DOC_TIPDOC"+GetWhere("=","NEN")+" AND DOC_ESTADO"+GetWhere("=","E"))
+
+  EJECUTAR("DPCAMPOSADD","DPINVUTILIZ" ,"UTL_LIBINV","L",01,0,"Afecta Libro de Inventario","",.T.,.F.,".F.")
+
+  EJECUTAR("CREATERECORD","DPINVUTILIZ",{"UTL_CODIGO"   ,"UTL_LIBINV"},;
+                                        {"Tara de Carga",.F. },NIL,.T.,"UTL_CODIGO"+GetWhere("=","Tara de Carga"))
+
+  EJECUTAR("DPCAMPOSADD" ,"DPMOVSERIAL","MSR_CODIGO","C",20,0,"Código")
+
+  IF EJECUTAR("ISFIELDMYSQL","DPMOVSERIAL","MSR_CODIGO",.T.)
+
+    cSql:=[ UPDATE DPMOVSERIAL ]+;
+          [ INNER JOIN DPMOVINV ON MSR_CODSUC=MOV_CODSUC AND MSR_CODALM=MOV_CODALM AND MSR_TIPDOC=MOV_TIPDOC AND MSR_CODCTA=MOV_CODCTA AND MSR_NUMDOC=MOV_DOCUME AND MSR_ITEM=MOV_ITEM ]+;
+          [ SET ]+;
+          [ MSR_CODIGO=MOV_CODIGO, ]+;
+          [ MSR_LOTE  =MOV_LOTE ]+;
+          [ WHERE MSR_CODIGO="" ]
+
+     DpMsgSetText("Asignando Código en Movimiento de Productos")
+
+     oDb:Execute(cSql)
+
+  ENDIF
+
+  cSql:= [ DELETE FROM DPINDEX WHERE IND_CLAVE=""]
+  OpenOdbc(oDp:cDsnConfig):Execute(cSql)
+
+  cSql:= [ UPDATE DPINDEX SET IND_INDICE=CONCAT(IND_TABLA,"_",IND_INDICE) WHERE LENGTH(IND_INDICE)=1 ]
+  OpenOdbc(oDp:cDsnConfig):Execute(cSql)
+
+  EJECUTAR("DPCAMPOSADD","DPMOVINV","MOV_DOCASO","C",10,0,"Documento Exportado"    )
+  EJECUTAR("DPCAMPOSADD","DPMOVINV","MOV_TIPASO","C",03,0,"Tipo Documento Expotado")
+  EJECUTAR("DPCAMPOSADD","DPMOVINV","MOV_MTODIV","N",19,2,"Monto en Divisa")
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"                  ,"MNU_CONDIC" ,"MNU_TIPO","MNU_TITULO" },;
+                                   {"19F04"     ,"19"        ,"04"        ,"F"         ,[EJECUTAR("CONFIGSYS")],[ISRELEASE("20.01")],4         ,[Configuración del Sistema]},;
+            NIL,.T.,"MNU_CODIGO"+GetWhere("=","19F04"))
+
+  SQLUPDATE("DPCTA","CTA_ACTIVO",.F.,"CTA_DESCRI"+GetWhere(" LIKE ","%Recuperada%"))
+
+  IF !ISSQLFIND("DPTIPDOCCLI","TDC_TIPO"+GetWhere("=","NRC")) 
+     EJECUTAR("DPTIPDOCCLICREA","NRC","Nota de Recepción del Cliente",0,"9999999999")
+     SQLUPDATE("DPTIPDOCCLI",{"TDC_MONETA","TDC_ACTIVO","TDC_CXC","TDC_DOCDES","TDC_PRODUC"},{.T.,.T.,"N","PED",.T.},"TDC_TIPO"+GetWhere("NRC"))
+  ENDIF
+
+  EJECUTAR("DPCAMPOSADD","DPALMACEN"  ,"ALM_CODDEP","C",10 ,0,"Código Departamento")
+
+  EJECUTAR("DPTIPDOCCLICOLADD")
+
+  DpMsgClose()  
+
+  oData:=DATASET(cId,"ALL")
+  oData:Set(cId,cId)
+  oData:Save()
+  oData:End()
+
+RETURN .T.
+// EOF
+
+
+
