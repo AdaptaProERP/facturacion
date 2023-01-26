@@ -1,0 +1,37 @@
+// Programa   : DPTIPDOCCLICOLCLONE
+// Fecha/Hora : 26/01/2023 10:13:42
+// Propósito  : Copiar Definición de Columnas
+// Creado Por : Juan  Navas
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN(cTipOrg,cTipDes,lReset)
+  LOCAL cWhere,oTableO,oTableD
+
+  DEFAULT cTipOrg:="FAV",;
+          cTipDes:="CTZ",;
+          lReset :=.T.
+
+  IF lReset
+     SQLDELETE("DPTIPDOCCLICOL","CTD_TIPDOC "+GetWhere("=",cTipDes))
+  ENDIF
+
+  oTableO:=OpenTable(" SELECT * FROM DPTIPDOCCLICOL WHERE CTD_TIPDOC "+GetWhere("=",cTipOrg),.T.)
+  oTableD:=OpenTable(" SELECT * FROM DPTIPDOCCLICOL",.F.)
+ 
+  WHILE !oTableO:EOF()
+      oTableD:AppendBlank()
+      AEVAL(oTableO:aFields,{|a,n| oTableD:Replace(a[1],oTableO:FieldGet(n))})
+      oTableD:Replace("CTD_TIPDOC",cTipDes)
+      oTableD:Commit()
+      oTableO:DbSkip()
+  ENDDO
+
+  oTableD:End()
+  oTableO:End()
+
+RETURN .T.
+// EOF

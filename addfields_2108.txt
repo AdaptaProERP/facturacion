@@ -1,0 +1,203 @@
+// Programa   : ADDFIELDS_2108
+// Fecha/Hora : 18/01/2021 11:03:42
+// Propósito  : Agregar Campos en Release 21_03
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN()
+  LOCAL cId   :="ADDFIELD2108_33" 
+  LOCAL oData,cWhere,cSql,I,cCodigo,cDescri,lRun
+  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+  LOCAL oFrm,cUrl,cWhere,oTable,oDataC
+  LOCAL aFields:={}
+  LOCAL cCodigo,cDescri,cSql,lRun,aFields,cNumEje
+  LOCAL cFile :="add\"+cId+"_"+oDp:cDsnData+".ADD"
+
+  IF FILE("DATADBF\DPTABLAS.DBF") .AND. FILE(cFile)
+     RETURN .T.
+  ENDIF
+
+  oData:=DATASET(cId,"ALL")
+
+  IF oData:Get(cId,"")<>cId 
+     oData:End()
+  ELSE
+     oData:End()
+     RETURN
+  ENDIF
+
+  IF oDp:lCrearTablas .OR. Empty(oDb:GetTables())
+     oData:=DATASET(cId,"ALL")
+     oData:Set(cId,cId)
+     oData:Save()
+     oData:End()
+     DPWRITE(cFile,cFile)
+     RETURN .T.
+  ENDIF
+
+  oFrm:=MSGRUNVIEW("Actualizando Base de Datos R:21.08")
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 0"
+  oDb:Execute(cSql)
+
+  IF oDp:cRif="J299633771"
+     oDb:Execute([UPDATE NMTRABAJADOR SET DESCONTAR="S",DESC_LPH="S"])
+  ENDIF
+
+  EJECUTAR("DPCAMPOSADD" ,"DPDOCCLI"      ,"DOC_VTAANT","L",01,0,"Venta Anticipada")
+  EJECUTAR("DPCAMPOSADD" ,"DPDOCCLI"      ,"DOC_FORPAG","C",01,0,"Forma de Pago Condicionada")
+
+  EJECUTAR("SETFIELDLONG","DPIPC","IPC_INPC" ,19,5	)
+  EJECUTAR("SETFIELDLONG","DPIPC","IPC_TASA" ,19,5	)
+
+
+  EJECUTAR("FIXCHARSETREPLACE","NMCONCEPTOS")
+  EJECUTAR("FIXCHARSETREPLACE","DPCTAMODELO")
+
+  oDb:Execute("UPDATE dpdocpro INNER JOIN dpcbtepago   ON PAG_CODSUC=DOC_CODSUC AND PAG_NUMERO=DOC_PAGNUM AND DOC_ACT=0 SET DOC_ACT=PAG_ACT WHERE PAG_ACT=1 ")
+  oDb:Execute("UPDATE dpdoccli INNER JOIN dpreciboscli ON REC_CODSUC=DOC_CODSUC AND REC_NUMERO=DOC_RECNUM AND DOC_ACT=0 SET DOC_ACT=REC_ACT WHERE REC_ACT=1 ")
+  oDb:Execute([UPDATE dpdoccli SET DOC_ACT=1,DOC_ESTADO="AC" WHERE DOC_ACT IS NULL])
+
+
+  EJECUTAR("ISFIELDVIEW","VIEW_DOCCLICXCDIV","CXD_MTODOC",oDp:cDsnData,.T.)
+
+  EJECUTAR("DPCAMPOSADD","DPBANCOS","BAN_XLSFIN" ,"N",02,0,"Columna Final"       ,"",NIL,NIL)
+
+
+  OpenOdbc(oDp:cDsnData):EXECUTE([ UPDATE DPDOCCLI SET DOC_VTAANT=0 WHERE DOC_TIPDOC="VTA" AND DOC_TIPTRA="D" AND DOC_VTAANT IS NULL ])
+
+  EJECUTAR("CREATERECORD","DPGRUREP",{"GRR_CODIGO"    ,"GRR_DESCRI"                        ,"GRR_ALTER" },;
+                                     {STRZERO(10,08),"Aportes de Trabajadores y la Empresa",.F.     },;
+                                     NIL,.T.,"GRR_CODIGO"+GetWhere("=",STRZERO(10,08)))
+
+
+  cCodigo:="DPINVSLD"
+  cDescri:="Saldo Consolidado"
+  lRun   :=.T.
+
+  cSql:=[ SELECT SLD_CODIGO, ]+CRLF+;
+        [ SUM(IF(SLD_FISICO IS NULL,0,SLD_FISICO)) AS SLD_FISICO,]+CRLF+;
+        [ SUM(IF(SLD_LOGICO IS NULL,0,SLD_LOGICO)) AS SLD_LOGICO,]+CRLF+;
+        [ SUM(IF(SLD_CONTAB IS NULL,0,SLD_CONTAB)) AS SLD_CONTAB ]+CRLF+;
+        [ FROM dpinvsld ]+CRLF+;
+        [ GROUP BY SLD_CODIGO ]+CRLF+;
+        [ ORDER BY SLD_CODIGO ]
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cCodigo:="INVUBICAFISICA"
+  cDescri:="Ubicación Física del Producto"
+  lRun   :=.T.
+
+   cSql:=[ SELECT  UXP_CODIGO AS UBI_CODINV,]+CRLF+;
+         [ UXP_CODUBI AS UBI_CODUBI,]+CRLF+;
+         [ UBI_DESCRI,]+CRLF+;	
+         [ UBI_CODALM, ]+CRLF+;
+         [ ALM_DESCRI AS UBI_ALMACEN, ]+CRLF+;
+         [ UBI_PASILL, ]+CRLF+;
+         [ UBI_ANAQUE, ]+CRLF+;
+         [ UBI_NIVEL, ]+CRLF+;
+         [ UBI_SUBNIV ]+CRLF+;
+         [ FROM dpinvubifisica ]+CRLF+;
+         [ INNER JOIN dpubicacfis ON UXP_CODUBI=UBI_CODIGO ]+CRLF+;
+         [ LEFT  JOIN DPALMACEN ON ALM_CODSUC=UBI_CODSUC AND ALM_CODIGO=UBI_CODALM ]+CRLF+;
+         [ GROUP BY UXP_CODIGO,UXP_CODUBI ]
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cCodigo:="TRANSFERENCIABCODEB"
+  cDescri:="Transferencias Bancaria Débito"
+  lRun   :=.T.
+
+  cSql   :=[ SELECT MOB_CODSUC AS TDB_CODSUC,]+CRLF+;
+           [ MOB_TRAASO AS TDB_NUMTRA, ]+CRLF+;
+           [ MOB_TIPO   AS TDB_TIPO  , ]+CRLF+;
+           [ MOB_CODBCO AS TDB_CODBCO, ]+CRLF+;
+           [ MOB_CUENTA AS TDB_CUENTA, ]+CRLF+;
+           [ BAN_NOMBRE AS TDB_NOMBRE, ]+CRLF+;
+           [ MOB_ACT    AS TDB_ACT   , ]+CRLF+;
+           [ MOB_MONTO  AS TDB_MONTO , ]+CRLF+;
+           [ MOB_FECHA  AS TDB_FECHA , ]+CRLF+;
+           [ MOB_HORA   AS TDB_HORA  , ]+CRLF+;
+           [ IF(MOB_ACT=1,"Activo","Nulo") AS TDB_ESTADO ]+CRLF+;
+           [ FROM dpctabancomov   ]+CRLF+;
+           [ INNER  JOIN DPBANCOS ON DPCTABANCOMOV.MOB_CODBCO=DPBANCOS.BAN_CODIGO ]+CRLF+;
+           [ WHERE MOB_ORIGEN="TRA" AND MOB_TIPO  ="DEBT" ]+CRLF+;
+           [ ORDER BY MOB_CODSUC,MOB_NUMTRA,MOB_MONTO,MOB_FECHA,MOB_HORA ]
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  EJECUTAR("DPCTAMODCREA")
+  SQLUPDATE("DPCTA","CTA_CODMOD",oDp:cCtaMod,"CTA_CODMOD IS NULL")
+
+  EJECUTAR("SETFIELDLONG","DPDOCPROCTA","CCD_DESCRI",130,0)
+  EJECUTAR("SETFIELDLONG","DPDOCCLICTA","CCD_DESCRI",130,0)
+
+  EJECUTAR("DPCAMPOSADD","NMFECHAS","FCH_NUMDOC" ,"C",20,0,"Documento CxP"       ,"",NIL,NIL)
+  EJECUTAR("DPTIPDOCPROCREA","NOM","Nómina por Pagar","D")
+
+  oDp:cPictPrecio:=FIELDPICTURE("DPMOVINV","MOV_PRECIO" ,.T.)
+  oDp:cPictPeso  :=FIELDPICTURE("DPMOVINV","MOV_PESO"   ,.T.)
+  oDp:cPictCanUnd:=FIELDPICTURE("DPMOVINV","MOV_CANTID" ,.T.)
+  oDp:cPictTotRen:=FIELDPICTURE("DPMOVINV","MOV_TOTAL"  ,.T.)
+  oDp:cPictCosto :=FIELDPICTURE("DPMOVINV","MOV_COSTO"  ,.T.)
+
+  SQLUPDATE("DPTIPDOCCLICOL","CTD_PICTUR",oDp:cPictPrecio,"CTD_FIELD"+GetWhere("=","MOV_PRECIO")+" AND (CTD_PICTUR"+GetWhere("=","")+" OR CTD_PICTUR IS NULL)")
+  SQLUPDATE("DPTIPDOCCLICOL","CTD_PICTUR",oDp:cPictCanUnd,"CTD_FIELD"+GetWhere("=","MOV_CANTID")+" AND (CTD_PICTUR"+GetWhere("=","")+" OR CTD_PICTUR IS NULL)")
+  SQLUPDATE("DPTIPDOCCLICOL","CTD_PICTUR",oDp:cPictCosto ,"CTD_FIELD"+GetWhere("=","MOV_COSTO" )+" AND (CTD_PICTUR"+GetWhere("=","")+" OR CTD_PICTUR IS NULL)")
+  SQLUPDATE("DPTIPDOCCLICOL","CTD_PICTUR",oDp:cPictPeso  ,"CTD_FIELD"+GetWhere("=","MOV_PESO"  )+" AND (CTD_PICTUR"+GetWhere("=","")+" OR CTD_PICTUR IS NULL)")
+
+/*
+  oDp:oMsgRun:FRMTEXT("Unificando Registros de Movimientos de Caja")
+  EJECUTAR("DPCAJADEPREPETIDOS")
+
+  oDp:oMsgRun:FRMTEXT("Unificando Documentos del Clientes")
+  EJECUTAR("UNIQUETABLAS","DPDOCCLI","DOC_CODSUC,DOC_TIPDOC,DOC_TIPTRA,DOC_NUMERO,DOC_RECNUM,DOC_FECHA")
+
+  oDp:oMsgRun:FRMTEXT("Unificando Documentos del Proveedor")
+  EJECUTAR("UNIQUETABLAS","DPDOCCLI","DOC_CODSUC,DOC_TIPDOC,DOC_TIPTRA,DOC_NUMERO,DOC_RECNUM,DOC_FECHA")
+
+  oDp:oMsgRun:FRMTEXT("Unificando Movimiento de Productos")
+  EJECUTAR("UNIQUETABLAS","DPMOVINV","MOV_APLORG,MOV_CODSUC,MOV_TIPDOC,MOV_DOCUME,MOV_CODCTA,MOV_ITEM")
+*/
+
+  EJECUTAR("DPCAMPOSADD","DPMEMO"         ,"MEM_ID"   ,"C",10,0,"Número de ID")
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"             ,"MNU_CONDIC"        ,"MNU_TIPO","MNU_TITULO" },; 
+                                   {"18P55"     ,"18"        ,"55"        ,"P"         ,[EJECUTAR("SETDOLARIZA")],[ISRELEASE("21.09")],1         ,[Aplicar Dolarización]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","18P55"))
+
+  oData:=DATASET(cId,"ALL")
+  oData:Set(cId,cId)
+  oData:Save()
+  oData:End()
+
+  DPWRITE(cFile,cFile)
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 1"
+  oDb:Execute(cSql)
+
+  DpMsgClose()
+
+RETURN .T.
+// EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

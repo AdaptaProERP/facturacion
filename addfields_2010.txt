@@ -1,0 +1,216 @@
+// Programa   : ADDFIELDS_2010
+// Fecha/Hora : 08/09/2019 11:03:42
+// Propósito  : Agregar Campos en Release 20_08
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN()
+  LOCAL cId   :="ADDFIELD2010_68",oData,cWhere,cSql,I
+  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+  LOCAL oDbC  :=OpenOdbc(oDp:cDsnConfig)
+  LOCAL oFrm,cUrl,cFile,cWhere
+  LOCAL aFields:={}
+
+  oData:=DATASET(cId,"ALL")
+
+  IF oData:Get(cId,"")<>cId 
+     oData:End()
+  ELSE
+     oData:End()
+     RETURN
+  ENDIF
+
+  IF oDp:lCrearTablas .OR. Empty(oDb:GetTables())
+     oData:=DATASET(cId,"ALL")
+     oData:Set(cId,cId)
+     oData:Save()
+     oData:End()
+     RETURN .T.
+  ENDIF
+
+  oFrm:=MSGRUNVIEW("Actualizando Base de Datos R:20.10")
+
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 0"
+  oDbC:Execute(cSql)
+
+   EJECUTAR("UNIQUETABLAS","DPMENU","MNU_MODULO,MNU_VERTIC,MNU_HORIZO")
+
+  cSql:=[ UPDATE dpmenu SET MNU_CODIGO=CONCAT(LEFT(MNU_MODULO,2),LEFT(MNU_VERTIC,1),MNU_HORIZO)]
+  oDbC:Execute(cSql)
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 1"
+  oDbC:Execute(cSql)
+
+  cWhere:="CAM_TABLE"+GetWhere("=","DPBANCOS")+" AND "+GetWhereOr("CAM_NAME",{"BAN_DEFXLS","BAN_DEFCSV","BAN_DEFXML"})
+  SQLUPDATE("DPCAMPOS","CAM_TYPE","M",cWhere)
+ 
+  EJECUTAR("DPCAMPOSADD","DPEMPRESA","EMP_EM_ID" ,"C",080,0,"Id eManager",NIL)
+  EJECUTAR("DPCAMPOSADD","DPEMPRESA","EMP_EMDOM" ,"C",080,0,"Dominio"    ,NIL)
+  EJECUTAR("DPCAMPOSADD","DPEMPRESA","EMP_EMLOG" ,"C",080,0,"Login"      ,NIL)
+  EJECUTAR("DPCAMPOSADD","DPEMPRESA","EMP_EMPASS","C",080,0,"Clave"      ,NIL)
+  EJECUTAR("DPCAMPOSADD","DPEMPRESA","EMP_EMGTIP","C",250,0,"Tipo de Afiliación"      ,NIL)
+
+  EJECUTAR("DPCAMPOSADD","DPBCODEFCONC","DFC_SIGNO","C",1,0,"Signo")
+  EJECUTAR("DPCAMPOSADD","DPBCODEFCONC","DFC_SIGNO","C",1,0,"Suma")
+  EJECUTAR("DPCAMPOSADD","DPBCODEFCONC","DFC_SIGNO","C",1,0,"Resta")
+
+  EJECUTAR("DPCAMPOSADD","DPCTABANCO"  ,"BCO_DIASCO","N",3,0,"Días para conciliar")
+
+  EJECUTAR("DPCAMPOSADD","DPBCOCTAREGCON","ECB_TIPBCO"  ,"C",04 ,0,"Tipo de Transacción Bancario")
+
+  EJECUTAR("DPCAMPOSADD","DPOBJFIN","OBF_DESCRI"  ,"C",250,0,"Descripción")
+  EJECUTAR("DPCAMPOSADD","DPOBJFIN","OBF_PORPRO"  ,"N",005,2,"% Proporcional")
+
+  EJECUTAR("SETFIELDLONG","DPOBJFIN","OBF_PORPRO",5)
+
+  SQLUPDATE("DPOBJFIN","OBF_DESCRI","Venta General","OBF_CODIGO"+GetWhere("=","VTAGEN"))
+  SQLUPDATE("DPOBJFIN","OBF_CODIGO","Venta General","OBF_CODIGO"+GetWhere("=","VTAGEN"))
+
+
+  EJECUTAR("SETFIELDLONG","DPEMPRESA"     ,"EMP_EMGTIP",250)
+  EJECUTAR("SETFIELDLONG","DPCTABANCOMOV" ,"MOB_MTODIV",19,2)
+  EJECUTAR("SETFIELDLONG","DPBCOCTAREGCON","ECB_MTODIV",19,2)
+
+  EJECUTAR("DPCAMPOSADD","DPCTABANCOMOV","MOB_CHKSUM"  ,"N",06,0,"CheckSum Registro de Conciliación")
+  EJECUTAR("DPCAMPOSADD","DPCTABANCOMOV","MOB_SLDBCO"  ,"N",19,2,"Saldo Bancario")
+
+  CheckTable("DPBANCOS")
+
+  EJECUTAR("UNIQUETABLAS","DPDIARIO","DIA_FECHA")
+
+  EJECUTAR("DPCAMPOSADD","DPCLACTAEGRE","CCE_CLRGRA","N",10,0,"Color para Gráficas")
+  EJECUTAR("DPCAMPOSADD","DPVENDEDOR"  ,"VEN_CLRGRA","N",10,0,"Color para Gráficas")
+  EJECUTAR("DPCAMPOSADD","DPESTADOS"   ,"CLRGRA"    ,"N",10,0,"Color para Gráficas")
+  EJECUTAR("DPCAMPOSADD","DPGRU"       ,"GRU_CLRGRA","N",10,0,"Color para Gráficas")
+  EJECUTAR("DPCAMPOSADD","DPMARCAS"    ,"MAR_CLRGRA","N",10,0,"Color para Gráficas")
+
+  IF COUNT("DPCLACTAEGRE")=COUNT("DPCLACTAEGRE","CCE_ACTIVO=0")
+     SQLUPDATE("DPCLACTAEGRE","CCE_ACTIVO",.T.)
+  ENDIF
+
+  SQLUPDATE("DPCLACTAEGRE","CCE_ACTIVO",.T.,"CCE_ACTIVO IS NULL")
+
+  oDp:nLen:=SQLGET("DPPROVEEDOR","MAX(LENGTH(PRO_NOMBRE))")
+
+  EJECUTAR("SETFIELDLONG","DPRIF"   ,"RIF_NOMBRE"  ,oDp:nLen)
+
+  cSql:=" UPDATE dprif INNER JOIN dpproveedor ON PRO_RIF=RIF_ID SET RIF_NOMBRE=PRO_NOMBRE,RIF_PROVEE=1 "
+
+  oDb:EXECUTE(cSql)
+ 
+  cSql:=" UPDATE dprif INNER JOIN dpclientes  ON DPCLIENTES.CLI_RIF=RIF_ID SET RIF_NOMBRE=DPCLIENTES.CLI_NOMBRE,RIF_CLIENTE=1 "
+
+  oDb:EXECUTE(cSql)
+
+  //                                  1234567890
+
+//  Innecesario lo utiliza RIF_ESTORG
+//  EJECUTAR("DPCAMPOSADD","DPRIF"    ,"RIF_INTERN","L",1,0,"Interno")
+//  SQLUPDATE("DPRIF","RIF_INTERN",.T.,"LEFT(RIF_ID,3)"+GetWhere("=","COS"))
+//  SQLUPDATE("DPRIF","RIF_INTERN",.T.,"LEFT(RIF_ID,3)"+GetWhere("=","DEP"))
+//  SQLUPDATE("DPRIF","RIF_INTERN",.T.,"LEFT(RIF_ID,3)"+GetWhere("=","ALM"))
+
+  EJECUTAR("DPCAMPOSADD","DPCAJA","CAJ_CODMON","C",04,0,"Moneda")
+
+  EJECUTAR("DPCAMPOSADD","DPCTABANCO","BCO_FCHCON","D",08,0,"Fecha de Conciliación")
+  EJECUTAR("DPCAMPOSADD","DPCTABANCO","BCO_CONDIG","L",01,0,"Conciliación Digital",NIL,.T.,.T.)
+  EJECUTAR("DPCAMPOSADD","DPCBTEPAGO","PAG_NUMPAR","C",05,0,"Número de Partida")
+
+  cSql:=" UPDATE DPCBTEPAGO  SET PAG_NUMPAR"+GetWhere("=","00000")+" OR PAG_NUMPAR IS NULL OR PAG_NUMPAR"+GetWhere("=","")
+
+  oDb:EXECUTE(cSql)
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCBTEPAGO"  ,"PAG_MTODIF","N",20,2,"Diferencia de Pago")
+  EJECUTAR("DPCAMPOSADD" ,"DPCBTEPAGO"  ,"PAG_DIFCAM","N",20,2,"Diferencia Cambiario")
+
+
+//SQLUPDATE("DPCTABANCO","BCO_CONDIG",.T.,"INNER JOIN DPBANCOS ON DPBANCOS.BAN_CODIGO = DPCTABANCO.BCO_CODIGO WHERE BAN_DEFXLS<>''")
+
+  cSql:=" UPDATE DPCTABANCO INNER JOIN DPBANCOS ON DPBANCOS.BAN_CODIGO = DPCTABANCO.BCO_CODIGO SET BCO_CONDIG=1 WHERE BAN_DEFXLS<>''"
+
+  oDb:EXECUTE(cSql)
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"            ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"19F16"     ,"19"        ,"16"        ,"F"         ,[DPLBX("DPMAPAPRC.LBX")],[]          ,3         ,[Mapa por Procesos]},;
+                                     NIL,.T.,"MNU_CODIGO"+GetWhere("=","19F16"))
+
+  SQLUPDATE("DPMENU","MNU_ACCION",[EJECUTAR("DPDOCCXC")],"MNU_CODIGO"+GetWhere("=","04T70"))
+
+  EJECUTAR("DPCAMPOSADD","DPCENCOS","CEN_CODINV","C",20,0,"Código de Producto")
+
+  EJECUTAR("SETFIELDLONG","DPBCOCTAREGCON","ECB_MTODIV",19,2)
+  EJECUTAR("SETFIELDLONG","DPBCOCTAREGCON","ECB_VALCAM",19,2)
+
+  IF !EJECUTAR("DBISTABLE",NIL,"DPBCOCTAREGCON_HIS")
+     EJECUTAR("DPTABLEHIS","DPBCOCTAREGCON",oDp:cDsnData,"_HIS",.F.)
+  ENDIF
+
+  EJECUTAR("SETFIELDLONG","DPBCOCTAREGCON_HIS","ECB_MTODIV",19,2)
+  EJECUTAR("SETFIELDLONG","DPBCOCTAREGCON_HIS","ECB_VALCAM",19,2)
+
+  EJECUTAR("SETFIELDLONG","DPPROCESOS","PRC_DESCRI",120)
+
+  
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"          ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"03O98"     ,"03"        ,"98"        ,"O"         ,[EJECUTAR("BEMAMENU")],[]          ,3         ,[Opciones Impresora Fiscal]},;
+                                     NIL,.T.,"MNU_CODIGO"+GetWhere("=","03O98"))
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"          ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"04T07"     ,"04"        ,"07"        ,"T"         ,[EJECUTAR("BREDOCTABCOREC")],[]          ,3         ,[Crear Recibos desde Conciliación Digital]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","04T07"))
+
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"              ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"04P10"     ,"04"        ,"10"        ,"P"         ,[EJECUTAR("BRCTABCOXCON")],[]          ,3         ,[Conciliación Bancaria]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","04P10"))
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"                 ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"05P83"     ,"05"        ,"83"        ,"P"         ,[EJECUTAR("BRCBTEPAGCONTAB")],[]          ,3         ,[Contabilizar Comprobantes de Pago]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","05P83"))
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"          ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"19P32"     ,"19"        ,"32"        ,"P"         ,[EJECUTAR("UPDATEALLBD")],[]          ,3         ,[Actualizar Todas las Bases de Datos]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","19P32"))
+
+  EJECUTAR("DPCTABANFCHCONUPDATE")
+
+  IF COUNT("DPTIPDOCCLICOL","CTD_FIELD"+GetWhere("=","MOV_PREDIV"))=0
+     SQLDELETE("DPTIPDOCCLICOL")
+  ENDIF
+
+  EJECUTAR("DPTABTOMOD","DPCODINTEGRA")
+  EJECUTAR("DPTABTOMOD","DPPROVEEDOR")
+
+   cSql:=[ UPDATE dptipdoccli_cta SET CIC_CODINT="CODCTA" WHERE CIC_CODINT="CUENTA" ]
+  oDb:Execute(cSql)
+
+  cSql:=[ UPDATE dpproveedor_cta SET CIC_CODINT="CODCTA" WHERE CIC_CODINT="CUENTA" ]
+  oDb:Execute(cSql)
+
+  EJECUTAR("DPCAMPOSADD","DPCODINTEGRA" ,"CIN_ASIABR" ,"L",1,0,"Incluye Abreviatura",NIL,.T.,.F.,".F.") // Registro Activo
+
+//  EJECUTAR("DPINDEXOPTMZ")
+
+  DpMsgClose()
+  
+  oData:=DATASET(cId,"ALL")
+  oData:Set(cId,cId)
+  oData:Save()
+  oData:End()
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 1"
+  oDb:Execute(cSql)
+
+
+RETURN .T.
+// EOF
+
+
+
+
+

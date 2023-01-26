@@ -1,0 +1,28 @@
+// Programa   : DPMOVINVSET4DEC
+// Fecha/Hora : 24/05/2022 09:34:52
+// Propósito  : Asignar Cuatro Decimales para Facturación
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN()
+
+  LOCAL oTable
+
+  oTable:=OpenTable("SELECT MOV_CANTID,MOV_PRECIO FROM DPMOVINV LIMIT 0",.T.)
+  oTable:End()
+
+? oTable:FieldDec("MOV_PRECIO")
+/*
+SQLUPDATE([DPCAMPOS],{[CAM_DEC]    ,[CAM_FORMAT]},{4,[9,999,999.9999]},[CAM_NAME="MOV_PRECIO"])
+SQLUPDATE([DPTIPDOCCLICOL],[CTD_PICTUR] ,[9,999,999.9999],[CTD_FIELD="MOV_PRECIO"])
+EJECUTAR("DPLOADPICTURE")
+Checktable("DPMOVINV")
+oDp:cPictPrecio:=FIELDPICTURE("DPMOVINV" ,"MOV_PRECIO" ,.T.)
+MensajeErr(oDp:cPictPrecio,"Formato Final")
+RETURN
+*/
+

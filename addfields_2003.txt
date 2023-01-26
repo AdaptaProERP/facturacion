@@ -1,0 +1,180 @@
+// Programa   : ADDFIELDS_2003
+// Fecha/Hora : 08/09/2019 11:03:42
+// Propósito  : Agregar Campos en Release 20_01
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN()
+  LOCAL cId   :="ADDFIELD2003_54",oData,cWhere,cSql,I
+  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+  LOCAL oFrm
+  LOCAL aFields:={},aData:={}
+
+  oData:=DATASET(cId,"ALL")
+
+  IF oData:Get(cId,"")<>cId 
+     oData:End()
+  ELSE
+     oData:End()
+     RETURN
+  ENDIF
+
+  IF oDp:lCrearTablas .OR. Empty(oDb:GetTables())
+     oData:=DATASET(cId,"ALL")
+     oData:Set(cId,cId)
+     oData:Save()
+     oData:End()
+     RETURN .T.
+  ENDIF
+
+  oFrm:=MSGRUNVIEW("Actualizando Base de Datos R:20.03")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPLIBINV"      ,"LIV_INPC_I","N",10,2,"IPC")
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLIEXP","TEX_TIPINI","C",03,2,"Tipo Documento Inicial")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPPLACOS","PLA_CODMOD","C",06,2,"Código")
+
+  EJECUTAR("DPCAMPOSADD","DPPCLOG"  ,"PC_FCHDPX" ,"C",20,0,"Fecha+Hora Archivos DpXbase")
+  EJECUTAR("DPCAMPOSADD","DPPCLOG"  ,"PC_FCHREP" ,"C",20,0,"Fecha+Hora Archivos Reportes")
+  EJECUTAR("DPCAMPOSADD","DPPCLOG"  ,"PC_FCHRPT" ,"C",20,0,"Fecha+Hora Archivos Crystal")
+  EJECUTAR("DPCAMPOSADD","DPPCLOG"  ,"PC_FCHFRM" ,"C",20,0,"Fecha+Hora Archivos Forms")
+
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FILDPX" ,10)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FILREP" ,10)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FILRPT" ,10)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FILFRM" ,10)
+
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FCHFRM" ,20)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FCHREP" ,20)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FCHRPT" ,20)
+  EJECUTAR("SETFIELDLONG","DPPCLOG","PC_FCHFRM" ,20)
+
+
+
+  cWhere:="CAM_TABLE"+GetWhere("=","DPPCLOG")+" AND "+GetWhereOr("CAM_NAME",{"PC_FCHREP","PC_FCHRPT","PC_FCHFRM"})
+
+  SQLUPDATE("DPCAMPOS",{"CAM_TYPE","CAM_LEN"},{"C",10},cWhere)
+
+  EJECUTAR("SETFIELDLONG","DPMENU","MNU_TITULO" ,120)
+
+  EJECUTAR("DPCAMPOSADD" ,"DPVISTAS","VIS_PRGPRE"    ,"C",30,2,"Programa Prejecución")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCTABANCO" ,"BCO_NUMMEM","N",07,0,"Memo Banco")
+  EJECUTAR("DPCAMPOSADD" ,"DPTABMON"   ,"MON_MSGURL","C",250,2,"Dirección URL")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPLIBINV"   ,"LIV_INPC_I","N",10,2,"IPC")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPDOCREQINV","REQ_CODORG"  ,"C",20,2,"Código Origen")
+  EJECUTAR("DPCAMPOSADD" ,"DPDOCREQINV","REQ_CODDES"  ,"C",20,2,"Código Destino")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCENCOS"   ,"CEN_PRODUC"  ,"L",01,0,"Uso Productivo")
+  EJECUTAR("DPCAMPOSADD" ,"DPRIF"      ,"RIF_ESTORG"  ,"L",01,0,"Estructura Organizacional")
+
+  EJECUTAR("SETFIELDLONG","DPMOVINV_REGP","MOV_ASOTIP",4)
+
+  EJECUTAR("DPCAMPOSADD" ,"DPEMPRESA","EMP_FCHRES"  ,"D",10 ,0,"Fecha Respaldo")
+  EJECUTAR("DPCAMPOSADD" ,"DPEMPRESA","EMP_HORRES"  ,"C",10 ,0,"Hora Respaldo")
+  EJECUTAR("DPCAMPOSADD" ,"DPEMPRESA","EMP_SELRES"  ,"L",1  ,0,"Seleccionada para Respaldo")
+  EJECUTAR("DPCAMPOSADD" ,"DPEMPRESA","EMP_FILRES"  ,"C",250,0,"Archivo del Respaldo")
+
+
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_PESTAR"  ,"N",10,0,"Peso Tara")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_PESFCH"  ,"D",10,0,"Fecha Pesaje")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_PESHOR"  ,"C",10,0,"Hora Pesaje")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_CONTAR"  ,"N",10,0,"Contador Pesadas")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_INGRES"  ,"L",01,0,"Ingreso")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_CODINV"  ,"C",20,0,"Código del Producto")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_COMPRA"  ,"L",01,0,"Ingreso para Comprar")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_INDEF"   ,"L",01,0,"Ingreso Indefinido")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOS","VEH_CARGA"   ,"L",01,0,"Cargar")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_CODINV"  ,"C",20,0,"Código del Producto")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_CARGA"   ,"L",01,0,"Carga Despacho")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_COMPRA"  ,"L",01,0,"Compra")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_NUMASO"  ,"C",10,0,"Registro Asociado")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_NUMDIA"  ,"C",05,0,"Registro Diario")
+  EJECUTAR("DPCAMPOSADD" ,"DPVEHICULOSPESAJE","VHP_PESO"    ,"N",19,2,"Registro Diario")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLICOL"   ,"CTD_TIPDOC"  ,"C" ,03,0 ,"Tipo de Documento")
+
+  aData:=ASQL("SELECT VHP_NUMERO,VHP_PLACA,VHP_FECHA,VHP_HORA FROM DPVEHICULOSPESAJE WHERE VHP_NUMDIA IS NULL ORDER BY CONCAT(VHP_FECHA,VHP_HORA)")
+
+  AEVAL(aData,{|a,n| SQLUPDATE("DPVEHICULOSPESAJE","VHP_NUMDIA",STRZERO(n,5),"VHP_NUMERO"+GetWhere("=",a[1])+" AND "+;
+                                                                            "VHP_PLACA" +GetWhere("=",a[2]))})
+
+  OpenOdbc(oDp:cDsnData):EXECUTE([ UPDATE DPVEHICULOS SET VEH_INGRES=0 WHERE VEH_INGRES IS NULL])
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCENCOS"   ,"CEN_RIFMAQ"  ,"C",10,0,"RIF Servicios de Maquila")
+  EJECUTAR("DPCAMPOSADD" ,"DPALMACEN"  ,"ALM_RIFALM"  ,"C",10,0,"RIF Almacenadora Externo")
+  EJECUTAR("DPCAMPOSADD" ,"DPALMACEN"  ,"ALM_EXTERN"  ,"L",01,0,"Almacen Externo")
+
+  EJECUTAR("DPCAMPOSOPCADD","DPDOCCLI"   ,"DOC_ESTADO","Maquila"    ,.T.)
+  EJECUTAR("DPCAMPOSOPCADD","DPDOCCLI"   ,"DOC_ESTADO","Almacenado" ,.T.)
+
+  EJECUTAR("DPCAMPOSADD","DPCTABANCOMOV","MOB_CODMOD","C",06,0,"Código Cuenta Modelo",NIL,.T.,oDp:cCtaMod,"&oDp:cCtaMod")
+
+  SQLUPDATE("DPCTABANCOMOV","MOB_CODMOD",oDp:cCtaMod,"MOB_CODMOD IS NULL")
+
+  EJECUTAR("SETFIELDLONG","DPVEHICULOS","VEH_PESTAR",10,0)
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLI"   ,"TDC_REQAPR","L",01,0,"Requiere Aprobación")
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLI"   ,"TDC_ABREVI","C",15,0,"Abreviatura")
+
+
+  IF !ISSQLFIND("DPTIPDOCCLI","TDC_TIPO"+GetWhere("=","NRM")) 
+     EJECUTAR("DPTIPDOCCLICREA","NRM","Requisición de Maquila",0,"9999999999")
+     SQLUPDATE("DPTIPDOCCLI",{"TDC_MONETA","TDC_ACTIVO","TDC_CXC","TDC_DOCDES","TDC_PRODUC","TDC_REQAPR"},{.T.,.T.,"N","PED",.T.,.T.},"TDC_TIPO"+GetWhere("NRM"))
+  ENDIF
+
+  IF !ISSQLFIND("DPTIPDOCCLI","TDC_TIPO"+GetWhere("=","ALM")) 
+     EJECUTAR("DPTIPDOCCLICREA","ALM","Registro de Almacenaje",0,"9999999999")
+     SQLUPDATE("DPTIPDOCCLI",{"TDC_MONETA","TDC_ACTIVO","TDC_CXC","TDC_DOCDES","TDC_PRODUC","TDC_REQAPR"},{.F.,.T.,"N","PED",.T.,.T.},"TDC_TIPO"+GetWhere("NRM"))
+  ENDIF
+
+  SQLUPDATE("DPTIPDOCCLI",{"TDC_ABREVI","TDC_MONETA"},{"Almacenaje",.T.},"TDC_TIPO"+GetWhere("=","ALM")+" AND TDC_ABREVI IS NULL OR TDC_ABREVI"+GetWhere("=",""))
+  SQLUPDATE("DPTIPDOCCLI",{"TDC_ABREVI","TDC_MONETA"},{"Maquila"   ,.T.},"TDC_TIPO"+GetWhere("=","NRM")+" AND TDC_ABREVI IS NULL OR TDC_ABREVI"+GetWhere("=",""))
+  SQLUPDATE("DPTIPDOCCLI",{"TDC_ABREVI","TDC_MONETA"},{"Pedido"    ,.T.},"TDC_TIPO"+GetWhere("=","PED")+" AND TDC_ABREVI IS NULL OR TDC_ABREVI"+GetWhere("=",""))
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLI"   ,"TDC_REQAPR","L",01,0,"Requiere Aprobación")
+
+  EJECUTAR("DPINVSETUTILIZ")
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"              ,"MNU_CONDIC" ,"MNU_TIPO","MNU_TITULO" },;
+                                   {"18F05"     ,"18"        ,"05"        ,"F"         ,[EJECUTAR("DEFOBJFINVTA")],[ISRELEASE("20.01")],4,[Definición de Objetivo Financiero de Ventas]},;
+            NIL,.T.,"MNU_CODIGO"+GetWhere("=","18F05"))
+
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"                  ,"MNU_CONDIC" ,"MNU_TIPO","MNU_TITULO" },;
+                                   {"19P05"     ,"19"        ,"05"        ,"P"         ,[EJECUTAR("EXPORTPERSONALIZ")],[.T.],4,[Gestionar Personalizaciones y Diccionario/Datos]},;
+            NIL,.T.,"MNU_CODIGO"+GetWhere("=","19P05"))
+
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"                  ,"MNU_CONDIC" ,"MNU_TIPO","MNU_TITULO" },;
+                                   {"19P24"     ,"19"        ,"24"        ,"P"         ,[EJECUTAR("MYSQLRESTORE")]    ,[.T.],4,[Recuperación de Respaldos]},;
+            NIL,.T.,"MNU_CODIGO"+GetWhere("=","19P24"))
+
+
+  EJECUTAR("DPCAMPOSADD" ,"DPCLICLA"    ,"CLC_CLRGRA","N",10,0,"Color para Gráficas")
+
+  EJECUTAR("DPCAMPOSADD" ,"DPTIPDOCCLI" ,"TDC_CLRGRA","N",10,0,"Color para Gráficas")
+  OpenOdbc(oDp:cDsnData):EXECUTE([ UPDATE DPCTABANCOMOV INNER JOIN DPCTABANCO ON MOB_CUENTA=BCO_CTABAN SET MOB_CODBCO=BCO_CODIGO ])
+          
+  EJECUTAR("UNIQUETABLAS","DPMENU","MNU_CODIGO")
+
+  DpMsgClose()
+
+  oData:=DATASET(cId,"ALL")
+  oData:Set(cId,cId)
+  oData:Save()
+  oData:End()
+
+RETURN .T.
+// EOF
+
+
+
+

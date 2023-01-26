@@ -1,0 +1,76 @@
+// Programa   : DPTABLASCLONE
+// Fecha/Hora : 26/11/2020 09:32:54
+// Propósito  : Duplicar Tabla
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN(cTableOrg,cTableDes,cDescri)
+   LOCAL oTable,oTableO,cNumTab,aFields:={},cFileO,cFileD,cMemo,cLine,oTableD
+
+   DEFAULT cTableOrg:="DPTIPDOCCLICOL" ,;
+           cTableDes:="DPTIPDOCPROCOL",;
+           cDescri  :="Columnas Tipo Documento"
+
+   cFileO:="STRUCT\"+cTableOrg+".TXT"
+   cFileD:="STRUCT\"+cTableDes+".TXT"
+
+   IF FILE(cFileO) .AND. !FILE(cFileD)
+      cMemo:=MEMOREAD(cFileO)
+      cLine:="NOMBRE="+cTableOrg
+	 cMemo:=STRTRAN(cMemo," "+cTableOrg+" "," "+cTableDes+" ")
+      cMemo:=STRTRAN(cMemo,cLine,"NOMBRE="+cTableDes)
+      DPWRITE(cFileD,cMemo)
+   ENDIF
+
+   IF !ISSQLFIND("DPTABLAS","TAB_NOMBRE"+GetWhere("=",cTableDes))
+
+     // Crear la Tabla
+     oTableO:=OpenTable("SELECT * FROM DPTABLAS WHERE TAB_NOMBRE"+GetWhere("=",cTableOrg),.T.)
+     
+     cNumTab:=SQLINCREMENTAL("DPTABLAS","TAB_NUMERO")
+     oTableD:=OpenTable("SELECT * FROM DPTABLAS",.F.)
+     oTableD:AppendBlank()
+     AEVAL(oTableD:aFields,{|a,n| oTableD:Replace(a[1],oTableO:FieldGet(n))})
+     oTableD:Replace("TAB_NUMERO",cNumTab)
+     oTableD:Replace("TAB_NOMBRE",cTableDes)
+     oTableD:Replace("TAB_DESCRI",cDescri)
+     oTableD:Commit()
+
+   //   ELSE
+   //  RETURN .F.
+
+   ENDIF
+
+   SQLDELETE("DPCAMPOS","CAM_TABLE"+GetWhere("=",cTableDes))
+   oTableD:=OpenTable("SELECT * FROM DPCAMPOS",.F.)
+
+   // ? oTableD:Classname()
+   // ViewArray(oTableD:aFields)
+  
+
+   oTableO:=OpenTable("SELECT * FROM DPCAMPOS WHERE CAM_TABLE"+GetWhere("=",cTableOrg),.t.)
+
+   WHILE !oTableO:EOF()
+
+      oTableD:AppendBlank()
+      AEVAL(oTableD:aFields,{|a,n| oTableD:Replace(a[1],oTableO:FieldGet(n))})
+      oTableD:Replace("CAM_TABLE",cTableDes)
+      oTableD:Commit("")
+      oTableO:DbSkip()
+
+   ENDDO
+
+// oTableO:Browse()
+   oTableO:End()   
+   oTableD:End() 
+
+   LOADTABLAS(.T.)
+
+   EJECUTAR("DPCREATEFROMTXT",cTableDes,.T.)
+
+RETURN .T.
+// EOF

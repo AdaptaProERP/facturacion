@@ -1,0 +1,363 @@
+// Programa   : ADDFIELDS_2105
+// Fecha/Hora : 18/01/2021 11:03:42
+// Propósito  : Agregar Campos en Release 21_03
+// Creado Por :
+// Llamado por:
+// Aplicación :
+// Tabla      :
+
+#INCLUDE "DPXBASE.CH"
+
+PROCE MAIN(lRun)
+  LOCAL cId   :="ADDFIELD2105_45"
+  LOCAL oData,cWhere,cSql,I,cCodigo,cDescri,lRun
+  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+  LOCAL oFrm,cUrl,cWhere,oTable,oDataC
+  LOCAL aFields:={}
+  LOCAL cCodigo,cDescri,cSql,lRun,aFields,cNumEje
+  LOCAL cFile :="add\"+cId+"_"+oDp:cDsnData+".ADD"
+
+  DEFAULT lRun:=.F.
+
+  IF FILE("DATADBF\DPTABLAS.DBF") .AND. FILE(cFile)
+// .AND. !lRun
+     RETURN .T.
+  ENDIF
+
+  // no tiene diccionario de datos
+/*
+  IF !FILE("DATADBF\DPTABLAS.DBF") .AND. lRun
+     RETURN .F.
+  ENDIF
+ 
+  RELEASEDATASET()
+*/
+  oData:=DATASET(cId,"ALL")
+
+  IF oData:Get(cId,"")<>cId .OR. lRun
+     oData:End()
+  ELSE
+     oData:End()
+     RETURN
+  ENDIF
+
+  IF oDp:lCrearTablas .OR. Empty(oDb:GetTables())
+     oData:=DATASET(cId,"ALL")
+     oData:Set(cId,cId)
+     oData:Save()
+     oData:End()
+     DPWRITE(cFile,cFile)
+     RETURN .T.
+  ENDIF
+
+  oFrm:=MSGRUNVIEW("Actualizando Base de Datos R:21.05")
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 0"
+  oDb:Execute(cSql)
+
+  EJECUTAR("DPTIPDOCDIFCAMCREA")
+
+  EJECUTAR("SETFIELDLONG","DPDOCCLI","DOC_IMPOTR" ,19,2)
+
+  SQLUPDATE("DPCAMPOS","CAM_DEFAUL",["Nacional"],"CAM_TABLE"+GetWhere("=","DPCLIENTES")+" AND CAM_NAME"+GetWhere("=","CLI_ZONANL"))
+
+  IF !ISSQLFIND("DPTABLAS","TAB_NOMBRE"+GetWhere("=","DPTIPDOCCLICOL"))
+	EJECUTAR("DPTABLASIMPORT","DPTIPDOCCLICOL")
+  ENDIF
+
+  EJECUTAR("DBISTABLE",oDp:cDsnData,"DPTIPDOCCLICOL",.T.) 
+
+  EJECUTAR("DPCAMPOSADD","DPTIPDOCDIFCAM","DDC_SELECT","L",001,0,"Seleccionar",NIL,.T.,.F.)
+
+  EJECUTAR("DPCAMPOSADD","DPTIPDOCCLI","TDC_REGTAR","L",01,0,"Genera Control de Taras de Carga",NIL,.T.,.F.)
+
+  EJECUTAR("DPTIPDOCCLICREA","PRE","Presupuesto","N")
+
+  cCodigo:="TABMONXCLI"
+  cDescri:="Clientes por Divisa"
+  cSql   :=[ SELECT CLI_CODMON,COUNT(*) FROM dpclientes GROUP BY CLI_CODMON ORDER BY CLI_CODMON]
+  lRun   :=.T.
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  SQLUPDATE("DPTIPDOCCLI","TDC_DESCRI","Cotización","TDC_TIPO"+GetWhere("=","CTZ"))
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"             ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"22P59"     ,"22"        ,"59"        ,"P"         ,[EJECUTAR("SETTRIGGERS",NIL,NIL,.F.,NIL,NIL,.T.)],[]          ,1         ,[Ejecutar Todos los Disparadores (TRIGGERS) BD {oDp:cDsnData} ]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","22P59"))
+
+  EJECUTAR("CREATERECORD","DPMENU",{"MNU_CODIGO","MNU_MODULO","MNU_HORIZO","MNU_VERTIC","MNU_ACCION"             ,"MNU_CONDIC","MNU_TIPO","MNU_TITULO" },; 
+                                   {"22P60"     ,"22"        ,"60"        ,"P"         ,[EJECUTAR("SETTRIGGERS",NIL,NIL,.T.,NIL,NIL,.T.)],[]          ,1         ,[Ejecutar Todos los Disparadores (TRIGGERS) BD {oDp:cDsnConfig}]},;
+                                    NIL,.T.,"MNU_CODIGO"+GetWhere("=","22P60"))
+
+  IF !EJECUTAR("DBISTABLE",NIL,"DPMOVINV_TARAS")
+     EJECUTAR("DPTABLEHIS","DPMOVINV",oDp:cDsnData,"_TARAS",.F.)
+  ENDIF
+
+  EJECUTAR("SETFIELDLONG","DPCAMPOS","CAM_FORMAT" ,35)
+
+  EJECUTAR("DPLINKADD","DPCLIENTES" ,"DPCLIENTES_CTA" ,"CLI_CODIGO","CIC_CODIGO",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPPROVEEDOR","DPPROVEEDOR_CTA","PRO_CODIGO","CIC_CODIGO",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPGRU"      ,"DPGRU_CTA"      ,"GRU_CODIGO","CIC_CODIGO",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPCAJA"     ,"DPCAJA_CTA"     ,"CAJ_CODIGO","CIC_CODIGO",.T.,.T.,.T.)
+
+  EJECUTAR("DPLINKADD","DPCTA"      ,"DPCLIENTES_CTA" ,"CTA_CODMOD,CTA_CODIGO","CIC_CTAMOD,CIC_CUENTA",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPCTA"      ,"DPPROVEEDOR_CTA","CTA_CODMOD,CTA_CODIGO","CIC_CTAMOD,CIC_CUENTA",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPCTA"      ,"DPGRU_CTA"      ,"CTA_CODMOD,CTA_CODIGO","CIC_CTAMOD,CIC_CUENTA",.T.,.T.,.T.)
+  EJECUTAR("DPLINKADD","DPCTA"      ,"DPCAJA_CTA"     ,"CTA_CODMOD,CTA_CODIGO","CIC_CTAMOD,CIC_CUENTA",.T.,.T.,.T.)
+
+  IF !ISSQLFIND("DPTABMON","MON_CODIGO"+GetWhere("=","DBC"))
+     SQLUPDATE("DPTABMON","MON_CODIGO","DBC","MON_CODIGO"+GetWhere("=","$"))
+  ENDIF
+
+  IF ISSQLFIND("DPTABMON","MON_CODIGO"+GetWhere("=","$")) .AND. !ISSQLFIND("DPTABMON","MON_CODIGO"+GetWhere("=","DBC"))
+    SQLUPDATE("DPTABMON","MON_CODIGO","DBC","MON_CODIGO"+GetWhere("=","$"))
+  ENDIF
+
+  SQLDELETE("DPTABMON","MON_CODIGO"+GetWhere("=","$"))
+
+  IF ISSQLFIND("DPTABMON","MON_CODIGO"+GetWhere("=","*")) .AND. !ISSQLFIND("DPTABMON","MON_CODIGO"+GetWhere("=","X"))
+    SQLUPDATE("DPTABMON","MON_CODIGO","DOL","MON_CODIGO"+GetWhere("=","X"))
+  ENDIF
+
+  IF ISSQLFIND("DPPRECIOTIP","TPP_CODIGO"+GetWhere("=","*")) .AND. !ISSQLFIND("DPPRECIOTIP","TPP_CODIGO"+GetWhere("=","X"))
+    SQLUPDATE("DPPRECIOTIP","TPP_CODIGO","X","TPP_CODIGO"+GetWhere("=","*"))
+  ENDIF
+
+  cCodigo:="DOCCLIRMU"
+  cDescri:="Retención Municipal por Documento "
+
+  cSql   :=[ SELECT  ]+CRLF+;         
+           [ DOC_TIPDOC               AS RMU_TIPDOC,]+CRLF+;
+           [ DOC_NUMERO               AS RMU_DOCUME,]+CRLF+;
+           [ DOC_CODSUC               AS RMU_CODSUC,]+CRLF+;
+           [ DOC_FACAFE               AS RMU_NUMDOC,]+CRLF+;
+           [ SUM(DOC_NETO*DOC_CXC*-1) AS RMU_MONTO,]+CRLF+;
+           [ AVG(DOC_VALCAM)          AS RMU_VALCAM,]+CRLF+;
+           [ SUM((DOC_NETO*DOC_CXC*-1)/DOC_VALCAM) AS RMU_MTODIV,]+CRLF+;
+           [ COUNT(*) AS CUANTOS]+CRLF+;
+           [ FROM ]+CRLF+;
+           [ DPDOCCLI ]+CRLF+;
+           [ WHERE DOC_TIPTRA="D" AND DOC_TIPDOC="RMU" ]+CRLF+;
+           [ GROUP BY DOC_CODSUC,DOC_FACAFE ]+CRLF+;
+           [ ORDER BY DOC_CODSUC,DOC_FACAFE ]
+
+  lRun   :=.T.
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cSql   :=[ SELECT ]+CRLF+;
+           [ DOC_CODSUC AS ORG_CODSUC, ]+CRLF+;                           
+           [ DOC_TIPDOC AS ORG_TIPDOC, ]+CRLF+;                           
+           [ DOC_NUMERO AS ORG_NUMERO, ]+CRLF+;  
+           [ DOC_FECHA  AS ORG_FECHA,  ]+CRLF+;                         
+           [ DOC_NETO   AS ORG_NETO,   ]+CRLF+;                        
+           [ DOC_BASNET AS ORG_BASNET, ]+CRLF+;                     
+           [ DOC_MTOIVA AS ORG_MTOIVA, ]+CRLF+;                
+           [ DOC_VALCAM AS ORG_VALCAM, ]+CRLF+;  
+           [ DOC_ESTADO AS ORG_ESTADO  ]+CRLF+;                       
+           [ FROM DPDOCCLI ]+CRLF+;                                         
+           [ WHERE DOC_TIPTRA="D" AND DOC_CXC<>0 ]+CRLF+;                                     
+           [ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]+CRLF+;                                        
+           [ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]
+
+
+  cCodigo:="DOCCLIDOC"
+  cDescri:="Documento Origen para Calcular Comisiones x Cobranza "
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+
+  cCodigo:="DOCCLIRMU"
+  cDescri:="Retención Municipal por Documento "
+
+  cSql:=[ SELECT ]+;  
+        [ DOC_CODSUC AS RMU_CODSUC,]+CRLF+;  
+        [ DOC_TIPAFE AS RMU_TIPDOC,]+CRLF+;  
+        [ DOC_CODIGO AS RMU_CODIGO,]+CRLF+;  
+        [ DOC_FACAFE AS RMU_NUMDOC,]+CRLF+;  
+        [ DOC_NUMERO AS RMU_NUMERO,]+CRLF+;  
+        [ DOC_NETO   AS RMU_MONTO  ]+CRLF+;
+        [ FROM  ]+CRLF+;
+        [ DPDOCCLI ]+CRLF+; 
+        [ WHERE((DOC_TIPDOC="RMU") and (DOC_TIPTRA = "D")) ]+CRLF+;  
+        [ ORDER BY DOC_CODSUC,DOC_TIPAFE,DOC_FACAFE ]
+
+  lRun   :=.T.
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cSql   :=[ SELECT  SLD_CODIGO,SUM(SLD_FISICO) AS SLD_FISICO,SUM(SLD_LOGICO) AS SLD_LOGICO,SUM(SLD_CONTAB) AS SLD_CONTAB FROM DPINVSLD  GROUP BY SLD_CODIGO ]
+  cCodigo:="DPINVSLD"
+  cDescri:="Documento Origen para Calcular Comisiones x Cobranza "
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cCodigo:="VENTAS"
+  cDescri:="Ventas para eManager "
+  cSql   :=[ SELECT MOV_CODIGO AS id_detalle, inv_descri AS descripcion, mov_cantid AS cantidad, SLD_CONTAB AS stock, mov_fecha AS fecha, mov_precio AS precio, ]+CRLF+;
+           [ mov_total  AS total ]+CRLF+;
+           [ FROM dpmovinv ]+CRLF+;
+           [ INNER JOIN dpinv         ON MOV_CODIGO=INV_CODIGO ]+CRLF+;
+           [ INNER JOIN DPINVSLD      ON INV_CODIGO=SLD_CODIGO ]+CRLF+; 
+           [ WHERE MOV_APLORG="V" AND MOV_TIPDOC="FAV" AND MOV_INVACT=1 ]+CRLF+;
+           [ GROUP BY MOV_DOCUME ]+CRLF+;
+           [ ORDER BY MOV_DOCUME ]
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cCodigo:="CATEGORIA"
+  cDescri:="Categoría de Productos para eManager "
+  cSql   :=[ SELECT GRU_CODIGO AS id, GRU_DESCRI AS categoria FROM dpgru ORDER BY GRU_CODIGO]
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cCodigo:="PRODUCTOS"
+  cDescri:="Productos para eManager "
+  cSql   :=[ SELECT INV_CODIGO AS id,INV_GRUPO  AS id_categoria,INV_CODIGO AS codigo,INV_DESCRI AS descripcion,INV_OBS1   AS imagen, ]+;
+           [ INV_COSADQ AS precio_compra, ]+;
+           [ IF(PRE_PRECIO IS NULL,0,PRE_PRECIO) AS precio_venta,]+;
+           [ 0          AS ventas, ]+;
+           [ INV_FCHACT AS fecha ]+;
+           [ FROM dpinv ]+;
+           [ LEFT JOIN dpprecios ON PRE_CODIGO=INV_CODIGO AND PRE_LISTA="A" AND PRE_UNDMED="UND" ]
+           [ ORDER BY INV_CODIGO]
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+
+  cSql   :=[ SELECT CLI_CODIGO AS id,CLI_RIF  AS documento,CLI_NOMBRE AS nombre,CLI_EMAIL  AS email,CLI_TEL1   AS Telefono, CONCAT(CLI_DIR1,CLI_DIR2,CLI_DIR3) AS direccion,]+;
+           [ "0000-00-00" AS fecha_nacimiento, 0 AS compras, "0000-00-00" AS ultima_compra,"0000-00-00" AS fecha FROM dpclientes ]
+  cCodigo:="CLIENTES"
+  cDescri:="Clientes para eManager "
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+
+  cCodigo:="DOCCLICXCDIV"
+  cDescri:="CXC en Divisas por Documento de Cliente"
+  lRun   :=.T.
+  cSql   :=[ SELECT DOC_CODSUC AS CXD_CODSUC,DOC_TIPDOC AS CXD_TIPDOC,DOC_NUMERO AS CXD_NUMERO, ]+CRLF+;
+           [ DOC_CODIGO AS CXD_CODIGO, ]+CRLF+;       
+           [ MAX(DOC_FCHVEN) AS CXD_FCHMAX,]+CRLF+;                                                       
+           [ MIN(DOC_FECHA)  AS CXD_FECHA, ]+CRLF+;            
+           [ SUM(ROUND(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,0))/DOC_VALCAM),2)*DOC_CXC) AS CXD_CXCDIV, ]+CRLF+;
+           [ SUM(IF(DOC_TIPTRA="D",DOC_NETO,0)) AS CXD_MTODOC,]+CRLF+;       
+           [ SUM(DOC_NETO*DOC_CXC) AS CXD_NETO,]+CRLF+;                                                                         
+           [ SUM(IF(DOC_TIPTRA="P",DOC_NETO,0)) AS CXD_MTOPAG, ]+CRLF+;     
+           [ SUM(IF(DOC_TIPTRA="P",ROUND((DOC_NETO+DOC_MTOCOM)/DOC_VALCAM,2),0)) AS CXD_PAGDIV ]+CRLF+;
+           [ FROM dpdoccli ]+CRLF+;        
+           [ WHERE DOC_CXC<>0 AND DOC_ACT=1 AND DOC_VALCAM>1 ]+CRLF+;        
+           [ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]+CRLF+;        
+           [ HAVING TRUNCATE(SUM(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,0))/DOC_VALCAM)*DOC_CXC),2)<>0 ]+CRLF+;       
+           [ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]
+
+/*
+   [SELECT DOC_CODSUC AS CXD_CODSUC,DOC_TIPDOC AS CXD_TIPDOC,DOC_NUMERO AS CXD_NUMERO, 
+ DOC_CODIGO AS CXD_CODIGO, 
+ MAX(DOC_FCHVEN) AS CXD_FCHMAX,
+ MIN(DOC_FECHA)  AS CXD_FECHA, 
+ SUM(ROUND(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,0))/DOC_VALCAM),2)*DOC_CXC) AS CXD_CXCDIV, 
+ SUM(IF(DOC_TIPTRA="D",DOC_NETO,0)) AS CXD_MTODOC,
+ SUM(DOC_NETO*DOC_CXC) AS CXD_NETO,
+ SUM(IF(DOC_TIPTRA="P",DOC_NETO,0)) AS CXD_MTOPAG, 
+ SUM(IF(DOC_TIPTRA="P",ROUND((DOC_NETO+DOC_MTOCOM)/DOC_VALCAM,2),0)) AS CXD_PAGDIV 
+ FROM dpdoccli 
+ WHERE DOC_CXC<>0 AND DOC_ACT=1 AND DOC_VALCAM>1 
+ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO  
+ HAVING TRUNCATE(SUM(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,1))/DOC_VALCAM)*DOC_CXC),2)<>0 
+ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO
+*/
+
+  EJECUTAR("DPCAMPOSADD","DPDOCPRO"  ,"DOC_MTOCOM","N",19,2,"Monto Revalorización")
+
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+  cSql:=[ SELECT  ]+CRLF+;
+        [ DOC_CODSUC AS CXD_CODSUC, ]+CRLF+;
+        [ DOC_TIPDOC AS CXD_TIPDOC, ]+CRLF+;
+        [ DOC_NUMERO AS CXD_NUMERO, ]+CRLF+;
+        [ DOC_CODIGO AS CXD_CODIGO, ]+CRLF+;
+        [ MAX(DOC_FCHVEN) AS CXD_FCHMAX,]+CRLF+;
+        [ MIN(DOC_FECHA)  AS CXD_FECHA, ]+CRLF+;
+        [ SUM(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,1))/DOC_VALCAM)*DOC_CXP) AS CXD_CXPDIV, ]+CRLF+;
+        [ SUM(IF(DOC_TIPTRA="D",DOC_NETO,0)) AS CXD_MTODOC,]+CRLF+;        
+        [ SUM(DOC_NETO*DOC_CXP) AS CXD_NETO, ]+CRLF+;
+        [ SUM(IF(DOC_TIPTRA="P",DOC_NETO,0)) AS CXD_MTOPAG ]+CRLF+;
+        [ FROM dpdocpro ]+CRLF+;
+        [ WHERE DOC_CXP<>0 AND DOC_ACT=1 AND DOC_VALCAM>1 ]+CRLF+; 
+        [ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_CODIGO,DOC_NUMERO  ]+CRLF+;
+        [ HAVING ROUND(SUM(((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,1))/DOC_VALCAM)*DOC_CXP),2)<>0  ]+CRLF+;
+        [ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_CODIGO,DOC_NUMERO]
+
+  cCodigo:="DOCPROCXPDIV"
+  cDescri:="CXP en Divisas por Documento del Proveedor"
+  lRun   :=.T.
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql,lRun)
+
+  cSql:=[ SELECT  ]+CRLF+;
+        [ DOC_CODSUC AS CXD_CODSUC,]+CRLF+;
+        [ DOC_TIPDOC AS CXD_TIPDOC,]+CRLF+;                                                
+        [ DOC_NUMERO AS CXD_NUMERO,]+CRLF+;                                               
+        [ DOC_CODIGO AS CXD_CODIGO,]+CRLF+;                                    
+        [ MAX(DOC_FCHVEN) AS CXD_FCHMAX,]+CRLF+;                                    
+        [ DOC_FECHA       AS CXD_FECHA, ]+CRLF+;                                 
+        [ SUM(DOC_NETO*DOC_CXP) AS CXD_NETO,]+CRLF+;                
+        [ SUM(IF(DOC_TIPTRA="D",DOC_NETO,0)) AS CXD_MTODOC,]+CRLF+;                                                
+        [ SUM(IF(DOC_TIPTRA="P",DOC_NETO,0)) AS CXD_MTOPAG,]+CRLF+;  
+        [ SUM((DOC_NETO+IF(DOC_TIPTRA="P",DOC_MTOCOM,0)*DOC_CXP)/IF(DOC_VALCAM=1,0,DOC_VALCAM)) AS CXD_CXPDIV,]+CRLF+;      
+        [ SUM(DOC_NETO*DOC_CXP) AS CXD_SALDO ]+CRLF+;          
+        [ FROM DPDOCPRO ]+CRLF+;                                                
+        [ WHERE DOC_CXP<>0 AND DOC_ACT=1 ]+CRLF+;                                               
+        [ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_CODIGO,DOC_NUMERO ]+CRLF+;                                      
+        [ HAVING SUM(DOC_NETO*DOC_CXP)<>0 ]+CRLF+;                                               
+        [ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_CODIGO,DOC_NUMERO ]
+
+  cCodigo:="DOCPROCXP"
+  cDescri:="CXP por Documento del Proveedor"
+  lRun   :=.T.
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql,lRun)
+
+  cSql   :=[ SELECT ]+;
+           [ DOC_CODSUC      AS PAG_CODSUC,]+CRLF+;                                   
+           [ DOC_TIPDOC      AS PAG_TIPDOC,]+CRLF+;                                    
+           [ DOC_NUMERO      AS PAG_NUMERO,]+CRLF+;                                    
+           [ SUM(DOC_NETO)   AS PAG_NETO, ]+CRLF+;                
+           [ SUM(DOC_MTOCOM) AS PAG_MTODIF,]+CRLF+;               
+           [ SUM(DOC_NETO/IF(DOC_VALCAM>=1,DOC_VALCAM,0)) AS PAG_MTODIV, ]+CRLF+;                              
+           [ COUNT(*)        AS PAG_CUANTOS, ]+CRLF+;                        
+           [ DOC_RECNUM      AS PAG_RECNUM,  ]+CRLF+;                    
+           [ DOC_CBTNUM      AS PAG_CBTNUM,  ]+CRLF+;                  
+           [ DOC_FECHA       AS PAG_FECHA ,  ]+CRLF+;            
+           [ AVG(DOC_VALCAM) AS PAG_VALCAM ]+CRLF+;           
+           [ FROM DPDOCCLI  ]+CRLF+;                                  
+           [ WHERE DOC_TIPTRA="P" AND DOC_ACT=1 ]+CRLF+;                                    
+           [ GROUP BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]+CRLF+;                                   
+           [ ORDER BY DOC_CODSUC,DOC_TIPDOC,DOC_NUMERO ]
+
+  cCodigo:="DOCCLIPAG"
+  cDescri:="Pagos del Documento del Cliente  "
+  EJECUTAR("DPVIEWADD",cCodigo,cDescri,cSql)
+
+
+  oData:=DATASET(cId,"ALL")
+  oData:Set(cId,cId)
+  oData:Save()
+  oData:End()
+
+  DPWRITE(cFile,cFile)
+
+  cSql:=" SET FOREIGN_KEY_CHECKS = 1"
+  oDb:Execute(cSql)
+
+  DpMsgClose()
+
+RETURN .T.
+// EOF
+
+
+
+
+
+
+
+
+
+
+
+
