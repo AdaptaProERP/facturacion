@@ -963,37 +963,6 @@ FUNCTION IMPRIMIR()
 RETURN .T.
 
 FUNCTION LEEFECHAS()
-  LOCAL nPeriodo:=oCONTOFAV:oPeriodo:nAt,cWhere
-
-  oCONTOFAV:nPeriodo:=nPeriodo
-
-
-  IF oCONTOFAV:oPeriodo:nAt=LEN(oCONTOFAV:oPeriodo:aItems)
-
-     oCONTOFAV:oDesde:ForWhen(.T.)
-     oCONTOFAV:oHasta:ForWhen(.T.)
-     oCONTOFAV:oBtn  :ForWhen(.T.)
-
-     DPFOCUS(oCONTOFAV:oDesde)
-
-  ELSE
-
-     oCONTOFAV:aFechas:=EJECUTAR("DPDIARIOGET",nPeriodo)
-
-     oCONTOFAV:oDesde:VarPut(oCONTOFAV:aFechas[1] , .T. )
-     oCONTOFAV:oHasta:VarPut(oCONTOFAV:aFechas[2] , .T. )
-
-     oCONTOFAV:dDesde:=oCONTOFAV:aFechas[1]
-     oCONTOFAV:dHasta:=oCONTOFAV:aFechas[2]
-
-     cWhere:=oCONTOFAV:HACERWHERE(oCONTOFAV:dDesde,oCONTOFAV:dHasta,oCONTOFAV:cWhere,.T.)
-
-     oCONTOFAV:LEERDATA(cWhere,oCONTOFAV:oBrw,oCONTOFAV:cServer,oCONTOFAV)
-
-  ENDIF
-
-  oCONTOFAV:SAVEPERIODO()
-
 RETURN .T.
 
 
@@ -1142,12 +1111,6 @@ RETURN aData
 
 
 FUNCTION SAVEPERIODO()
-  LOCAL cFileMem:="USER\BRCONTOFAV.MEM",V_nPeriodo:=oCONTOFAV:nPeriodo
-  LOCAL V_dDesde:=oCONTOFAV:dDesde
-  LOCAL V_dHasta:=oCONTOFAV:dHasta
-
-  SAVE TO (cFileMem) ALL LIKE "V_*"
-
 RETURN .T.
 
 /*
@@ -1354,11 +1317,12 @@ FUNCTION VALCANEXP(oCol,uValue,nKey,lOk)
 RETURN .T.
 
 FUNCTION BRWSAVEDOC()
-   LOCAL nCxC:=EJECUTAR("DPTIPCXC",oCONTOFAV:cTipDes),oTable:=NIL,cWhere
-   LOCAL oMovInv,aData,I,oDoc
-   LOCAL cCodInv,nCantid,nPrecio,cUndMed,cTipIva,cItem,nPorIva,nCxUnd,nCostoD,cLote
+   LOCAL nCxC:=EJECUTAR("DPTIPCXC",oCONTOFAV:cTipDes),oTable:=NIL,cWhere,cWhereA
+   LOCAL oMovInv,aData,I,oDoc,cSql
+   LOCAL cCodInv,nCantid,nPrecio,cUndMed,cTipIva,cItem,nPorIva,nCxUnd,nCostoD,cLote,nPrecioD,nCant
    LOCAL nFisico:=0,nLogico:=0,nContab:=-1 // Descontará Contablemente el Producto
    LOCAL oMovOrg // Origen de la Consignación
+   LOCAL nItem  :=0
 
    oCONTOFAV:cNumero    :=EJECUTAR("DPDOCCLIGETNUM",oCONTOFAV:cTipDes)
 
@@ -1380,29 +1344,85 @@ FUNCTION BRWSAVEDOC()
            " MOV_TIPDOC"+GetWhere("=",oCONTOFAV:cTipDes)+" AND "+;
            " MOV_DOCUME"+GetWhere("=",oCONTOFAV:cNumero)+" AND "+;
            " MOV_APLORG"+GetWhere("=","V"    )
-
-   
-
+  
    FOR I=1 TO LEN(aData)
+    
+      nPrecioD:=aData[I,oCONTOFAV:COL_MOV_PREDIV]
+      cCodInv :=aData[I,oCONTOFAV:COL_MOV_CODIGO]
+      nCantid :=aData[I,oCONTOFAV:COL_MOV_CANEXP]
+      nPrecio :=ROUND(aData[I,oCONTOFAV:COL_MOV_PREDIV]*oCONTOFAV:nValCam,2)
+      cUndMed :=aData[I,oCONTOFAV:COL_MOV_UNDMED]
+      cTipIva :=aData[I,oCONTOFAV:COL_MOV_TIPIVA]
+      nPorIva :=aData[I,oCONTOFAV:COL_MOV_IVA   ]
+      nCxUnd  :=aData[I,oCONTOFAV:COL_MOV_CXUND]
+      nCostoD :=0 // Costo
+      cLote   :=""
+      
+      // Generar vinculo entre la Consignación y la factura, UBICA el registro según precio y cantidad
+      cSql:=[ SELECT   MOV_CODIGO,   MOV_TIPDOC,  MOV_DOCUME,  MOV_UNDMED,  ]+;
+            [  SUM(IF(MOV_TIPDOC='CON',MOV_CANTID*MOV_FISICO*-1,0)) AS MOV_CANCON, ]+;
+            [  SUM(IF(MOV_ASOTIP='CON' AND MOV_TIPDOC='FAV',MOV_CANTID*MOV_CONTAB*-1,0)) AS MOV_CANFAV, ]+;
+            [  SUM(IF(MOV_TIPDOC='CON',MOV_CANTID*MOV_FISICO*-1,0)-IF(MOV_ASOTIP='CON' AND MOV_TIPDOC='FAV',MOV_CANTID*MOV_FISICO*-1,0)) AS MOV_CANEXP,  ]+;
+            [  MOV_PREDIV,MOV_ITEM  ]+;
+            [  FROM  DPMOVINV  ]+;
+            [  INNER JOIN DPINV ON MOV_CODIGO=INV_CODIGO  ]+;
+            [  WHERE MOV_APLORG='V' AND (MOV_TIPDOC='CON' OR MOV_TIPDOC='FAV' OR MOV_TIPDOC='NEN' OR MOV_TIPDOC='CRE') AND MOV_INVACT=1  ]+;
+            [    AND MOV_CODCTA]+GetWhere("=",oCONTOFAV:cCodCli)+;
+            [    AND MOV_CODIGO]+GetWhere("=",cCodInv )+;
+            [    AND MOV_PREDIV]+GetWhere("=",nPrecioD)+;
+            [  GROUP BY MOV_CODIGO,MOV_TIPIVA,MOV_TIPDOC,MOV_DOCUME,MOV_PREDIV,MOV_ITEM  ]+;
+            [  HAVING MOV_CANEXP>0 ]
 
-      cCodInv:=aData[I,oCONTOFAV:COL_MOV_CODIGO]
-      nCantid:=aData[I,oCONTOFAV:COL_MOV_CANEXP]
-      nPrecio:=ROUND(aData[I,oCONTOFAV:COL_MOV_PREDIV]*oCONTOFAV:nValCam,2)
-      cUndMed:=aData[I,oCONTOFAV:COL_MOV_UNDMED]
-      cTipIva:=aData[I,oCONTOFAV:COL_MOV_TIPIVA]
-      nPorIva:=aData[I,oCONTOFAV:COL_MOV_IVA   ]
-      nCxUnd :=aData[I,oCONTOFAV:COL_MOV_CXUND]
-      nCostoD:=0 // Costo
-      cLote  :=""
+      oMovOrg:=OpenTable(cSql,.t.)
+      nCant  :=nCantid // Cantidad a Distribuir como Exportada
 
-      cItem:=STRZERO(I,5)
+      WHILE !oMovOrg:Eof() .AND. nCant>0
 
-      EJECUTAR("DPMOVINVCREA",oCONTOFAV:cCodSuc,oCONTOFAV:cTipDes,oCONTOFAV:cNumero,cCodInv,nCantid,nPrecio,cUndMed,nCxUnd,nCostoD,cLote,oCONTOFAV:dFecha,"V",oCONTOFAV:dFecha,;
-               oCONTOFAV:cCodCli,cTipIva,nPorIva,oCONTOFAV:nValCam,oMovInv,oDp:cLista,0,cItem)
+         nCantid:=MIN(oMovOrg:MOV_CANEXP,nCant)
 
-      SQLUPDATE("DPMOVINV",{"MOV_PREDIV","MOV_ASOTIP","MOV_FISICO","MOV_LOGICO","MOV_CONTAB"},;
-                           {aData[I,oCONTOFAV:COL_MOV_PREDIV],"CON",nFisico,nLogico,nContab},;
-               cWhere+" AND MOV_ITEM"+GetWhere("=",cItem))
+         nItem++
+         cItem:=STRZERO(nItem,5)
+
+         EJECUTAR("DPMOVINVCREA",oCONTOFAV:cCodSuc,oCONTOFAV:cTipDes,oCONTOFAV:cNumero,cCodInv,nCantid,nPrecio,cUndMed,nCxUnd,nCostoD,cLote,oCONTOFAV:dFecha,"V",oCONTOFAV:dFecha,;
+                   oCONTOFAV:cCodCli,cTipIva,nPorIva,oCONTOFAV:nValCam,oMovInv,oDp:cLista,0,cItem)
+
+         SQLUPDATE("DPMOVINV",{"MOV_PREDIV","MOV_ASOTIP","MOV_ASODOC"      ,"MOV_ITEM_A" ,"MOV_FISICO","MOV_LOGICO","MOV_CONTAB"},;
+                              {nPrecioD    ,"CON"       ,oMovOrg:MOV_DOCUME,oMovOrg:MOV_ITEM,nFisico,nLogico,nContab},;
+                              cWhere+" AND MOV_ITEM"+GetWhere("=",cItem))
+
+         // Debe Actualizar la cantidad Exportada en el documento Origen, facilita depurar la cantidad Concesionada - cantidad facturada
+         cWhereA:=[ WHERE MOV_CODSUC]+GetWhere("=",oCONTOFAV:cCodSuc )+;
+                  [   AND MOV_CODIGO]+GetWhere("=",cCodInv           )+;
+                  [   AND MOV_DOCUME]+GetWhere("=",oMovOrg:MOV_DOCUME)+;
+                  [   AND MOV_ITEM  ]+GetWhere("=",oMovOrg:MOV_ITEM  )+;
+                  [   AND MOV_CODIGO]+GetWhere("=",oMovOrg:MOV_CODIGO)+;
+                  [   AND MOV_PREDIV]+GetWhere("=",oMovOrg:MOV_PREDIV)
+
+         cSql  := [ UPDATE DPMOVINV SET MOV_EXPORT=MOV_EXPORT]+GetWhere("+",nCantid)+;
+                  [ ]+cWhereA
+
+         oMovOrg:EXECUTE(cSql)
+
+         nCant:=nCant-nCantid
+        
+         oMovOrg:DbSkip()
+
+      ENDDO
+
+      // si no localiza capas realizara la factura, primero está el negocio
+      IF oMovOrg:RecCount()=0     
+
+         EJECUTAR("DPMOVINVCREA",oCONTOFAV:cCodSuc,oCONTOFAV:cTipDes,oCONTOFAV:cNumero,cCodInv,nCantid,nPrecio,cUndMed,nCxUnd,nCostoD,cLote,oCONTOFAV:dFecha,"V",oCONTOFAV:dFecha,;
+                       oCONTOFAV:cCodCli,cTipIva,nPorIva,oCONTOFAV:nValCam,oMovInv,oDp:cLista,0,cItem)
+
+         SQLUPDATE("DPMOVINV",{"MOV_PREDIV","MOV_ASOTIP","MOV_FISICO","MOV_LOGICO","MOV_CONTAB"},;
+                               {aData[I,oCONTOFAV:COL_MOV_PREDIV],"CON",nFisico,nLogico,nContab},;
+                               cWhere+" AND MOV_ITEM"+GetWhere("=",cItem))
+      ENDIF
+
+      oMovOrg:Browse()
+
+      oMovOrg:End(.T.)
 
    NEXT I
 
