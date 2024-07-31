@@ -97,7 +97,7 @@ PROCE MAIN(cCodCli)
    oMdiCliT:Windows(0,0,aCoors[3]-170,415)  
 
 
-  @ 48, -1 OUTLOOK oMdiCliT:oOut ;
+  @ 48+30, -1 OUTLOOK oMdiCliT:oOut ;
        SIZE 150+250, oMdiCliT:oWnd:nHeight()-95 ;
        PIXEL ;
        FONT oFont ;
@@ -121,7 +121,7 @@ PROCE MAIN(cCodCli)
 
      DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
             BITMAP "BITMAPS\facturavta.BMP" ;
-            PROMPT "Facturar Cuotas "+LSTR(oMdiCliT:nCuoxFac) ;
+            PROMPT "Facturar "+LSTR(oMdiCliT:nCuoxFac)+" Cuotas"  ;
             ACTION (oMdiCliT:REGAUDITORIA("Facturar Cuotas"),;
                     EJECUTAR("BRCSCUOXFACT",NIL,NIL,NIL,NIL,NIL,NIL,oMdiCliT:cCodCli))
 
@@ -152,7 +152,7 @@ PROCE MAIN(cCodCli)
           BITMAP "BITMAPS\notacredito.BMP" ;
           PROMPT "Devoluciones de Venta ";
           ACTION (oMdiCliT:REGAUDITORIA("Devoluciones de Venta"),;
-                    EJECUTAR("BRTICKETPOS","DOC_CODIGO"+GetWhere("=",oMdiCliT:cCodCli),NIL,NIL,NIL,NIL,NIL,NIL,oMdiCliT:cCodCli))
+                    EJECUTAR("BRTICKETPOS",GetWhereOr("DOC_TIPDOC",{"FAV","FAM"})+" AND DOC_CODIGO"+GetWhere("=",oMdiCliT:cCodCli),NIL,NIL,NIL,NIL,"Devolución de Venta",NIL,oMdiCliT:cCodCli))
 
    DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
           BITMAP "BITMAPS\RECPAGO.BMP" ;
@@ -216,17 +216,23 @@ ENDIF
           ACTION (oMdiCliT:REGAUDITORIA("Facturación"),;
                   EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,"FAV",oMdiCliT:cCodCli,NIL,NIL,NIL,.F.))
 
-   DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
-          BITMAP "BITMAPS\notaentrega.BMP" ;
-          PROMPT "Notas de Entrega" ;
-          ACTION (oMdiCliT:REGAUDITORIA("Notas de Entrega"),;
-                  EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,"NEN",oMdiCliT:cCodCli,NIL,NIL,NIL,.F.))
+   IF ISSQLGET("DPTIPDOCCLI","TDC_ACTIVO","TDC_TIPO"+GetWhere("=","NEN"))
 
-   DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
-          BITMAP "BITMAPS\cotiza.BMP" ;
-          PROMPT "Cotización" ;
-          ACTION (oMdiCliT:REGAUDITORIA("Cotización"),;
-                  EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,"CTZ",oMdiCliT:cCodCli,NIL,NIL,NIL,.F.))
+     DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
+            BITMAP "BITMAPS\notaentrega.BMP" ;
+            PROMPT "Notas de Entrega" ;
+            ACTION (oMdiCliT:REGAUDITORIA("Notas de Entrega"),;
+                    EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,"NEN",oMdiCliT:cCodCli,NIL,NIL,NIL,.F.))
+   ENDIF
+
+   IF ISSQLGET("DPTIPDOCCLI","TDC_ACTIVO","TDC_TIPO"+GetWhere("=","CTZ"))
+
+     DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
+            BITMAP "BITMAPS\cotiza.BMP" ;
+            PROMPT "Cotización" ;
+            ACTION (oMdiCliT:REGAUDITORIA("Cotización"),;
+                    EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,"CTZ",oMdiCliT:cCodCli,NIL,NIL,NIL,.F.))
+   ENDIF
 
 
    DEFINE GROUP OF OUTLOOK oMdiCliT:oOut PROMPT "&Aplicar Retenciones"
@@ -242,6 +248,13 @@ ENDIF
           PROMPT "Retenciones de IVA" ;
           ACTION (oMdiCliT:REGAUDITORIA("Retenciones de IVA"),;
                   EJECUTAR("BRCLISINRTI","DOC_CODIGO"+GetWhere("=",oMdiCliT:cCodCli),NIL,NIL,NIL,NIL,NIL,oMdiCliT:cCodCli))
+
+   DEFINE BITMAP OF OUTLOOK oMdiCliT:oOut ;
+          BITMAP "BITMAPS\RETMUN.BMP" ;
+          PROMPT "Retención Municipal" ;
+          ACTION (oMdiCliT:REGAUDITORIA("Retención Municipal"),;
+                  oMdiCliT:DOCCXC(oMdiCliT:cCodCli,"RMU"))
+
   
    oMdiCliT:Activate("oMdiCliT:FRMINIT()") //,,"oMdiCliT:oSpl:AdjRight()")
 
@@ -253,7 +266,7 @@ RETURN oMdiCliT
 FUNCTION FRMINIT()
    LOCAL oCursor,oBar,oBtn,oFont,nCol:=12
 
-   DEFINE BUTTONBAR oBar SIZE 42,42 OF oMdiCliT:oWnd 3D CURSOR oCursor
+   DEFINE BUTTONBAR oBar SIZE 42+12,42+12 OF oMdiCliT:oWnd 3D CURSOR oCursor
 
    DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -11 BOLD
 
@@ -264,6 +277,7 @@ FUNCTION FRMINIT()
             NOBORDER;
             FONT oFont;
             FILENAME "BITMAPS\XBROWSE.BMP",NIL,"BITMAPS\XBROWSEG.BMP";
+            TOP PROMPT "Opciones";
             ACTION EJECUTAR("OUTLOOKTOBRW",oMdiCliT:oOut,oMdiCliT:cCodCli,oMdiCliT:cNombre,"DPCLIENTES","Consulta"),oMdiCliT:End();
             WHEN oDp:nVersion>=6
 
@@ -275,6 +289,7 @@ FUNCTION FRMINIT()
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\XSALIR.BMP";
+          TOP PROMPT "Cerrar";
           ACTION oMdiCliT:End()
 
   oBar:SetColor(CLR_BLACK,oDp:nGris)
@@ -284,7 +299,7 @@ FUNCTION FRMINIT()
 
   DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 UNDERLINE BOLD
 
-  @ 1,nCol SAYREF oMdiCliT:oCodCli PROMPT oMdiCliT:cCodCli;
+  @ 02,nCol+5 SAYREF oMdiCliT:oCodCli PROMPT oMdiCliT:cCodCli;
            SIZE 80,19 PIXEL COLOR CLR_WHITE,16744448 OF oBar FONT oFont
 
   SayAction(oMdiCliT:oCodCli,{||EJECUTAR("DPCLIENTES",0,oMdiCliT:cCodCli)})
@@ -292,10 +307,10 @@ FUNCTION FRMINIT()
 
   DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 BOLD
  
-  @ 21,nCol SAY oMdiCliT:cNombre;
-            SIZE 300,19 BORDER  PIXEL COLOR CLR_WHITE,16744448 OF oBar FONT oFont
+  @ 54,15 SAY oMdiCliT:cNombre;
+          SIZE 300,19 BORDER  PIXEL COLOR CLR_WHITE,16744448 OF oBar FONT oFont
 
-
+  oBar:SetSize(NIL,80,.T.)
   oBar:Refresh(.T.)
 
   oMdiCliT:oWnd:bResized:={||oMdiCliT:oWnd:oClient := oMdiCliT:oOut,;
@@ -601,6 +616,15 @@ FUNCTION PLANTILLAS()
   IF LEN(aData)=1
      EJECUTAR("BRCREADOCCLIPLA",NIL,NIL,NIL,aData[1,2],oMdiCliT:cCodCli,NIL,NIL,NIL,.F.)
   ENDIF
+
+RETURN .T.
+/*
+// 07/12/2023
+*/
+FUNCTION DOCCXC(cCodCli,cTipDoc)
+  LOCAL cNumero:=NIL
+  LOCAL x      :=SQLUPDATE("DPTIPDOCCLI","TDC_ACTIVO",.T.,"TDC_TIPO"+GetWhere("=",cTipDoc))
+  LOCAL oCxC   :=EJECUTAR("DPDOCCXC",cTipDoc,cCodCli,cNumero)
 
 RETURN .T.
 

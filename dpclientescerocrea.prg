@@ -41,7 +41,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cRif,cNombre,cDir1,cDir2,cDir3,cMuni,cZona,cC
   oTable:Replace("CCG_DIR3"  ,cDir3  )
   oTable:Replace("CCG_DIR4"  ,cMuni  )
   oTable:Replace("CCG_DIR5"  ,cZona  )
-  oTable:Replace("CCG_TEL1"  ,cTel   )
+//oTable:Replace("CCG_TEL1"  ,cTel   )
   oTable:Replace("CCG_TIPTRA","D"    )
   oTable:Replace("CCG_CODCLA",cCodCla) 
   oTable:Commit(oTable:cWhere)

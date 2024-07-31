@@ -113,6 +113,9 @@ FUNCTION MAIN(nOption,cCodigo,oDb,nModoFrm,cCatego)
   oCLIENTES:BtnSetMnu("BROWSE","Buscar por "+oDp:XDPACTIVIDAD_E,"BRWCLIENTES")  // Agregar Menú en Barra de Botones
   oCLIENTES:BtnSetMnu("BROWSE","Buscar por "+oDp:XDPCLICLA     ,"BRWCLIENTES")  // Agregar Menú en Barra de Botones
   oCLIENTES:BtnSetMnu("BROWSE","Buscar por "+oDp:XDPCTA        ,"BRWCLIENTES")  // Cuentas Contables
+  oCLIENTES:BtnSetMnu("BROWSE","Buscar Rango de Fecha "        ,"BRWCLIENTES")  // Rango de Fecha
+  oCLIENTES:BtnSetMnu("BROWSE","Buscar por Producto "          ,"BRWCLIENTES")  // Buscar por Producto
+
 
 // ,[oCLIENTES:BUSCARXNOMBRE()],[oCLIENTES:nOption=0 .OR. oCLIENTES:nOption=4])
 
@@ -134,7 +137,7 @@ FUNCTION MAIN(nOption,cCodigo,oDb,nModoFrm,cCatego)
   ENDIF
 
   oCLIENTES:OpcButtons("Menú de Opciones"         ,"MENU.BMP"          ,[EJECUTAR("DPCLIENTESMNU",oCLIENTES:CLI_CODIGO)])
-  oCLIENTES:OpcButtons("Registrar Cheque Devuelto","chequedevuelto.bmp",[EJECUTAR("DPCHQDEVCLI"  ,oCLIENTES:CLI_CODIGO)])
+//  oCLIENTES:OpcButtons("Registrar Cheque Devuelto","chequedevuelto.bmp",[EJECUTAR("DPCHQDEVCLI"  ,oCLIENTES:CLI_CODIGO)])
 
   IF oDp:cIdApl$"93" .AND. oDp:nVersion>5.0
     oCLIENTES:OpcButtons("Correspondencia en HTML","HTML.bmp",[EJECUTAR("BRCLIEMAIL",NIL,oCLIENTES:CLI_CODIGO)])
@@ -155,8 +158,12 @@ FUNCTION MAIN(nOption,cCodigo,oDb,nModoFrm,cCatego)
 
   ENDIF
 
-  oCLIENTES:cList:="DPCLIENTES.BRW"                  // Visualizar Clientes
-  oCLIENTES:cView:="DPCLIENTESCON()"                   // Programa Consulta
+  IF COUNT("DPCLIENTES")>2000
+    oCLIENTES:cList:="DPCLIENTESBRW" // "DPCLIENTES.BRW"                  // Visualizar Clientes
+  ELSE
+    oCLIENTES:cList:="DPCLIENTES.BRW"                  // Visualizar Clientes
+  ENDIF
+  oCLIENTES:cView:="DPCLIENTESCON"                   // Programa Consulta
   oClientes:cScopeOrg:=oClientes:cScope
   oCLIENTES:cCodCli:=oCLIENTES:CLI_CODIGO
 
@@ -450,7 +457,7 @@ FUNCTION LOAD()
 
     IF Empty(oCLIENTES:CLI_CODRUT)
       oCLIENTES:aScrollGets[3]:PUT("CLI_CODRUT",oDp:cCodRuta,2)
-      oCLIENTES:oCLI_CODRUT:SET(oDp:cCodRuta,.T.)
+      oCLIENTES:SET("CLI_CODRUT",oDp:cCodRuta)
     ENDIF
 
     DPFOCUS(oCLIENTES:oFocus)
@@ -483,6 +490,38 @@ FUNCTION PRESAVE()
   LOCAL lResp:=.T.,cMemo:="",I,uValue,cDir:="",cTel:="",cRIF:="",cIni:="",cFile:=""
   LOCAL aCampos:={"CLI_NOMBRE","CLI_RIF"}
   LOCAL aNombre:={"Nombre"    ,oDp:cNit}
+
+  oCLIENTES:CLI_RIF:=UPPER(oCLIENTES:CLI_RIF)
+
+  cRif:=oCLIENTES:CLI_RIF
+  cRif:=STRTRAN(cRif,"-","")
+
+  // Si no cumple la condición no lo valid
+  IF EVAL(oCLIENTES:oCLI_RIF:bWhen)
+
+    IF ISDIGIT(cRif)
+
+      cRif:=STRZERO(VAL(cRif),8)
+  
+    ELSE
+
+     IF LEN(ALLTRIM(cRif)) < 9 .AND. !(oCLIENTES:CLI_CODIGO=STRZERO(0,10)) 
+       oCLIENTES:oCLI_RIF:MsgErr("RIF Incorrecto -> Longitud mayor a 9 ")
+       RETURN .F.
+     ENDIF
+
+     IF !LEFT(cRif,1)$"JVGEPC" .AND. !(oCLIENTES:CLI_CODIGO=STRZERO(0,10)) 
+       oCLIENTES:oCLI_RIF:MsgErr("RIF Incorrecto -> Primera letra debe ser J, V , G , E , P o C")
+       RETURN .F.
+     ENDIF
+
+   ENDIF
+
+  ENDIF
+
+  IF Empty(oCLIENTES:CLI_CODIGO) .AND. !Empty(oCLIENTES:CLI_RIF)
+     oCLIENTES:oCLI_CODIGO:VarPut(cRif,.T.)
+  ENDIF
 
   lResp:=oCLIENTES:ValUnique(oCLIENTES:CLI_CODIGO)
 
@@ -528,28 +567,6 @@ FUNCTION PRESAVE()
   cRif:=STRTRAN(cRif,"-","")                      // Quita los guiones
 
   // Es Cedula
-// Si no cumple la condición no lo valid
-IF EVAL(oCLIENTES:oCLI_RIF:bWhen)
-
-  IF ISDIGIT(cRif)
-  
-     cRif:=STRZERO(VAL(cRif),8)
-     
-  ELSE
-
-    IF LEN(ALLTRIM(cRif)) < 9 .AND. !(oCLIENTES:CLI_CODIGO=STRZERO(0,10)) 
-      oCLIENTES:oCLI_RIF:MsgErr("RIF Incorrecto -> Longitud mayor a 9 ")
-      RETURN .F.
-    ENDIF
-
-    IF !LEFT(cRif,1)$"JVGEPC" .AND. !(oCLIENTES:CLI_CODIGO=STRZERO(0,10)) 
-      oCLIENTES:oCLI_RIF:MsgErr("RIF Incorrecto -> Primera letra debe ser J, V , G , E , P o C")
-      RETURN .F.
-    ENDIF
-
-  ENDIF
-
-ENDIF
   
   IF !Empty(cMemo) .AND. oCLIENTES:CLI_CODIGO<>STRZERO(0,10)
     MensajeErr(cMemo,"Campos no Pueden Quedar Vacios ") 
@@ -1161,7 +1178,13 @@ FUNCTION BRWCLIENTES(nOption,cOption)
 
   ENDIF
 
+  IF nOption=9 
+     RETURN EJECUTAR("DPCLIENTESBRW",oClientes:oTable,oClientes)
+  ENDIF
 
+  IF nOption=10 
+     RETURN EJECUTAR("BRWINVXCLI",oClientes)
+  ENDIF
 
 RETURN .T.
 

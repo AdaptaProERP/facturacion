@@ -11,11 +11,12 @@
 PROCE MAIN(cCodigo,cWhere,cTitle)
   LOCAL cSql,oTable,aData:={}
 
-  DEFAULT cCodigo:=STRZERO(1,10),;
+  DEFAULT cCodigo:=SQLGET("DPDOCCLI","DOC_CODIGO","DOC_CXC=1"),;
           cWhere :="DOC_CXC<>0 AND DOC_ACT='1'",;
           cTitle:="Documentos de Cuentas por Cobrar " 
 
-  cSql:=" SELECT DPDOCCLI.DOC_CODSUC,DPDOCCLI.DOC_NUMERO,DPDOCCLI.DOC_TIPDOC,DPDOCCLI.DOC_CODIGO,DPCLIENTES.CLI_NOMBRE,DPDOCCLI.DOC_TIPTRA,DPDOCCLI.DOC_CXC,DPDOCCLI.DOC_ACT,DPDOCCLI.DOC_ESTADO FROM DPDOCCLI "+;
+  cSql:=" SELECT DPDOCCLI.DOC_CODSUC,DPDOCCLI.DOC_NUMERO,DPDOCCLI.DOC_TIPDOC,DPDOCCLI.DOC_CODIGO,DPCLIENTES.CLI_NOMBRE,DPDOCCLI.DOC_TIPTRA,DPDOCCLI.DOC_CXC,DPDOCCLI.DOC_ACT,DPDOCCLI.DOC_ESTADO"+;
+        " ,DPDOCCLI.DOC_MTOIVA,DPDOCCLI.DOC_MTODIV,DPDOCCLI.DOC_BASNET,DPDOCCLI.DOC_VALCAM FROM DPDOCCLI "+;
         " INNER JOIN DPCLIENTES ON DPDOCCLI.DOC_CODIGO=DPCLIENTES.CLI_CODIGO "+;
         "  WHERE (DPDOCCLI.DOC_CODSUC"     +GetWhere("=",oDp:cSucursal)+;
         "   AND  "+cWhere+" AND DOC_ACT=1 AND DOC_CODIGO"+GetWhere("=",cCodigo)+")"+;
@@ -23,28 +24,35 @@ PROCE MAIN(cCodigo,cWhere,cTitle)
 
   oTable:=EJECUTAR("CLIDOCREP",NIL,cSql)
 
-  oTable:Gotop()
+  IF ValType(oTable)="O"
+     
+    oTable:Gotop()
 
-  WHILE !oTable:Eof()
+    WHILE !oTable:Eof()
 
-     AADD(aData,{oTable:DOC_TIPDOC,oTable:DOC_NUMERO,;
-                 oTable:DOC_CODVEN,;
-                 oTable:DOC_NETO  ,;
-                 oTable:DOC_PAGOS ,;
-                 oTable:DOC_SALDO ,;
-                 oTable:DOC_FECHA ,;
-                 oTable:DOC_FCHVEN,;
-                 oTable:DOC_DIAVEN,;
-                 oTable:DOC_CXC,;
-                 oTable:DOC_ESTADO})
+      AADD(aData,{oTable:DOC_TIPDOC,oTable:DOC_NUMERO,;
+                  oTable:DOC_CODVEN,;
+                  oTable:DOC_NETO  ,;
+                  oTable:DOC_PAGOS ,;
+                  oTable:DOC_SALDO ,;
+                  oTable:DOC_FECHA ,;
+                  oTable:DOC_FCHVEN,;
+                  oTable:DOC_DIAVEN,;
+                  oTable:DOC_CXC,;
+                  oTable:DOC_ESTADO,;
+                  oTable:DOC_VALCAM})
 
-     oTable:DbSkip()
+      oTable:DbSkip()
 
-  ENDDO
+   ENDDO
 
-//IIF(oTable:DOC_SALDO<>0,oDp:dFecha-oTable:DOC_FCHVEN,0),;
+  //IIF(oTable:DOC_SALDO<>0,oDp:dFecha-oTable:DOC_FCHVEN,0),;
 
-  oTable:End()
+   oTable:End()
+
+  ENDIF
+
+//  Viewarray(aData)
 
   IF !Empty(aData)
      ViewData(aData,cCodigo,cTitle)
@@ -61,6 +69,7 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
    LOCAL oFont,oFontB
    LOCAL nNeto:=0,nPagos:=0,nSaldo:=0
    LOCAL nDebe:=0,nHaber:=0
+   LOCAL aCoors:=GetCoors( GetDesktopWindow() )
 
    AEVAL(aData,{|a,n|nNeto:=nNeto+a[4],nPagos:=nPagos+a[5],nSaldo:=nSaldo+a[6]})
 
@@ -68,12 +77,22 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
 
    AEVAL(aData,{|a|nDebe:=nDebe+a[5],nHaber:=nHaber+a[6]})
 
-   DEFINE FONT oFont  NAME "Arial"   SIZE 0, -12 
-   DEFINE FONT oFontB NAME "Arial"   SIZE 0, -12 BOLD
+   DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 
+   DEFINE FONT oFontB NAME "Tahoma"   SIZE 0, -12 BOLD
 
-   oCliCxC:=DPEDIT():New(cTitle,"DPCLIENTESDOC.EDT","oCliCxC",.T.)
+// oCliCxC:=DPEDIT():New(cTitle,"DPCLIENTESDOC.EDT","oCliCxC",.T.)
+// oCLIDOC:CreateWindow(0,0,100,550)
+
+   DpMdi(cTitle,"oCliCxC","DPCLIENTESDOC.EDT")
+   oCliCxC:Windows(0,0,aCoors[3]-160,MIN(1142,aCoors[4]-10),.T.) // Maximizado
+
    oCliCxC:cCodigo:=cCodigo
    oCliCxC:cNombre:=cNombre
+   oCliCxC:cCodSuc:=oDp:cSucursal
+
+   oCliCxC:nClrPane1:=oDp:nClrPane1
+   oCliCxC:nClrPane2:=oDp:nClrPane2
+
    oCliCxC:lMsgBar:=.F.
 
    oCliCxC:oBrw:=TXBrowse():New( oCliCxC:oDlg )
@@ -109,7 +128,7 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
    oCliCxC:oBrw:aCols[4]:cFooter      :=TRAN(nNeto,"99,999,999,999.99")
    oCliCxC:oBrw:aCols[4]:bClrStd      := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
                                                          nClrText:=iif(oBrw:aArrayData[oBrw:nArrayAt,10]=1,CLR_HBLUE,CLR_HRED),;
-                                                        {nClrText,iif( oBrw:nArrayAt%2=0, 9690879, 14217982 ) } }
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oDp:nClrPane1, oDp:nClrPane2 ) } }
 
    oCliCxC:oBrw:aCols[5]:cHeader      :="Pagos"
    oCliCxC:oBrw:aCols[5]:nWidth       :=160
@@ -122,7 +141,7 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
    oCliCxC:oBrw:aCols[5]:bClrStd      := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
                                                          nClrText:=iif(oBrw:aArrayData[oBrw:nArrayAt,10]=-1,CLR_HBLUE,CLR_HRED),;
                                                          nClrText:=iif(oBrw:aArrayData[oBrw:nArrayAt,5 ]=0,        0,nClrText),;
-                                                        {nClrText,iif( oBrw:nArrayAt%2=0, 9690879, 14217982 ) } }
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oCliCxC:nClrPane1, oCliCxC:nClrPane2 ) } }
 
 
 
@@ -139,8 +158,7 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
    oCliCxC:oBrw:aCols[6]:bClrStd      := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
                                                          nClrText:=iif(oBrw:aArrayData[oBrw:nArrayAt,6 ]>0,CLR_HBLUE,CLR_HRED),;
                                                          nClrText:=iif(oBrw:aArrayData[oBrw:nArrayAt,6 ]=0, 0,nClrText),;
-                                                        {nClrText,iif( oBrw:nArrayAt%2=0, 9690879, 14217982 ) } }
-
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oDp:nClrPane1, oDp:nClrPane2 ) } }
 
 
    oCliCxC:oBrw:aCols[6]:cFooter      :=TRAN(nSaldo,"99,999,999,999.99")
@@ -164,20 +182,54 @@ FUNCTION ViewData(aData,cCodigo,cTitle)
 
    oCliCxC:oBrw:bClrStd               := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
                                                          nClrText:=0,;
-                                                        {nClrText,iif( oBrw:nArrayAt%2=0, 9690879, 14217982 ) } }
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oDp:nClrPane1, oDp:nClrPane2 ) } }
 
-   oCliCxC:oBrw:aCols[10]:cHeader      :="Edo."
+   oCliCxC:oBrw:aCols[10]:cHeader      :="Tipo"+CRLF+"CxC"
    oCliCxC:oBrw:aCols[10]:nWidth       :=035
-   oCliCxC:oBrw:aCols[10]:bStrData     :={|cEdo|cEdo:=oCliCxC:oBrw:aArrayData[oCliCxC:oBrw:nArrayAt,11],;
+   oCliCxC:oBrw:aCols[10]:nHeadStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[10]:bStrData     :={|nDias|nDias:=oCliCxC:oBrw:aArrayData[oCliCxC:oBrw:nArrayAt,10],;
+                                                TRAN(nDias,"9999")}
+   oCliCxC:oBrw:aCols[10]:nDataStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[10]:nHeadStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[10]:nFootStrAlign:= AL_RIGHT
+
+   oCliCxC:oBrw:bClrStd               := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
+                                                         nClrText:=0,;
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oDp:nClrPane1, oDp:nClrPane2 ) } }
+
+
+   oCliCxC:oBrw:aCols[11]:cHeader      :="Edo."
+   oCliCxC:oBrw:aCols[11]:nWidth       :=035
+   oCliCxC:oBrw:aCols[11]:bStrData     :={|cEdo|cEdo:=oCliCxC:oBrw:aArrayData[oCliCxC:oBrw:nArrayAt,11],;
                                                  Left(cEdo,3)}
 
+   oCliCxC:oBrw:aCols[12]:cHeader      :="Valor"+CRLF+"Divisa"
+   oCliCxC:oBrw:aCols[12]:nWidth       :=110
+   oCliCxC:oBrw:aCols[12]:nHeadStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[12]:bStrData     :={|nDivisa|nDivisa:=oCliCxC:oBrw:aArrayData[oCliCxC:oBrw:nArrayAt,12],;
+                                                   FDP(nDivisa,oDp:cPictValCam)}
+   oCliCxC:oBrw:aCols[12]:nDataStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[12]:nHeadStrAlign:= AL_RIGHT
+   oCliCxC:oBrw:aCols[12]:nFootStrAlign:= AL_RIGHT
+
+   oCliCxC:oBrw:bClrStd               := {|oBrw,nClrText|oBrw    :=oCliCxC:oBrw,;
+                                                         nClrText:=0,;
+                                                        {nClrText,iif( oBrw:nArrayAt%2=0, oDp:nClrPane1, oDp:nClrPane2 ) } }
+
+
+
+
+/*
    WHILE LEN(oCliCxC:oBrw:aCols)>10
       oCliCxC:oBrw:DelCol(LEN(oCliCxC:oBrw:aCols))
    ENDDO
+*/
 
    oCliCxC:oBrw:bClrHeader            := {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
    oCliCxC:oBrw:bClrFooter            := {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
    oCliCxC:oBrw:CreateFromCode()
+
+   oCliCxC:oWnd:oClient := oCliCxC:oBrw
 
    oCliCxC:Activate({||oCliCxC:ViewDatBar(oCliCxC)})
 
@@ -187,32 +239,56 @@ RETURN .T.
 // Barra de Botones
 */
 FUNCTION ViewDatBar(oCliCxC)
-   LOCAL oCursor,oBar,oBtn,oFont,oCol,nDif
+   LOCAL oCursor,oBar,oBtn,oFont,oCol,nDif,nLin
    LOCAL nWidth :=0 // Ancho Calculado seg£n Columnas
    LOCAL nHeight:=0 // Alto
    LOCAL nLines :=0 // Lineas
    LOCAL oDlg:=oCliCxC:oDlg
 
    DEFINE CURSOR oCursor HAND
-   DEFINE BUTTONBAR oBar SIZE 52-15,60-15 OF oDlg 3D CURSOR oCursor
+
+   IF oDp:lBtnText
+     DEFINE BUTTONBAR oBar SIZE oDp:nBtnWidth,oDp:nBarnHeight+6 OF oDlg 3D CURSOR oCursor
+   ELSE
+     DEFINE BUTTONBAR oBar SIZE 52-15,60-15 OF oDlg 3D CURSOR oCursor
+   ENDIF
+
+   oCliCxC:oFontBtn   :=oFont     // MDI:GOTFOCUS()
+   oCliCxC:nClrPaneBar:=oDp:nGris // MDI:GOTFOCUS() Repintar
+
+   DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -10 BOLD
 
    DEFINE BUTTON oBtn;
           OF oBar;
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\VIEW.BMP";
-          ACTION oCliCxC:View()
+          TOP PROMPT "Consulta"; 
+          ACTION  oCliCxC:View()
 
    oBtn:cToolTip:="Consultar Documento"
+
+
+   DEFINE BUTTON oBtn;
+          OF oBar;
+          NOBORDER;
+          FONT oFont;
+          FILENAME "BITMAPS\FORM.BMP";
+          TOP PROMPT "Formulario"; 
+          ACTION oCliCxC:VERDOCCLI()
+
+   oBtn:cToolTip:="Ver Formulario del Documento"
+
 
    DEFINE BUTTON oBtn;
           OF oBar;
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\XPRINT.BMP";
-          ACTION  (oDp:oRep:=REPORTE("CLIDOC"),;
-                   oFrmRun:oWnd:cTitle:=oCliCxC:cTitle+" ["+oCliCxC:cNombre+"]",;
-                   oDp:oRep:SetRango(1,oCliCxC:cCodigo,oCliCxC:cCodigo,.T.))
+          TOP PROMPT "Imprimir"; 
+          ACTION (oDp:oRep:=REPORTE("CLIDOC"),;
+                  oFrmRun:oWnd:cTitle:=oCliCxC:cTitle+" ["+oCliCxC:cNombre+"]",;
+                  oDp:oRep:SetRango(1,oCliCxC:cCodigo,oCliCxC:cCodigo,.T.))
 
    oBtn:cToolTip:="Listado de Documentos"
 
@@ -221,7 +297,8 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\EXCEL.BMP";
-          ACTION (EJECUTAR("BRWTOEXCEL",oCliCxC:oBrw,oCliCxC:cTitle,oCliCxC:cNombre))
+          TOP PROMPT "Excel"; 
+          ACTION  (EJECUTAR("BRWTOEXCEL",oCliCxC:oBrw,oCliCxC:cTitle,oCliCxC:cNombre))
 
    oBtn:cToolTip:="Exportar hacia Excel"
 
@@ -230,7 +307,8 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\xTOP.BMP";
-          ACTION (oCliCxC:oBrw:GoTop(),oCliCxC:oBrw:Setfocus())
+          TOP PROMPT "Primero"; 
+          ACTION  (oCliCxC:oBrw:GoTop(),oCliCxC:oBrw:Setfocus())
 
    oBtn:cToolTip:="Primer Documento"
 
@@ -239,7 +317,8 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\xSIG.BMP";
-          ACTION (oCliCxC:oBrw:PageDown(),oCliCxC:oBrw:Setfocus())
+          TOP PROMPT "Avance"; 
+          ACTION  (oCliCxC:oBrw:PageDown(),oCliCxC:oBrw:Setfocus())
 
    oBtn:cToolTip:="Página Siguiente"
 
@@ -249,7 +328,8 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\xANT.BMP";
-          ACTION (oCliCxC:oBrw:PageUp(),oCliCxC:oBrw:Setfocus())
+          TOP PROMPT "Anterior"; 
+          ACTION  (oCliCxC:oBrw:PageUp(),oCliCxC:oBrw:Setfocus())
 
    oBtn:cToolTip:="Página Anterior"
 
@@ -259,7 +339,8 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\xFIN.BMP";
-          ACTION (oCliCxC:oBrw:GoBottom(),oCliCxC:oBrw:Setfocus())
+          TOP PROMPT "Ultimo"; 
+          ACTION  (oCliCxC:oBrw:GoBottom(),oCliCxC:oBrw:Setfocus())
 
    oBtn:cToolTip:="Ultimo Documento"
 
@@ -269,18 +350,24 @@ FUNCTION ViewDatBar(oCliCxC)
           NOBORDER;
           FONT oFont;
           FILENAME "BITMAPS\XSALIR.BMP";
-          ACTION oCliCxC:Close()
+          TOP PROMPT "Cerrar"; 
+          ACTION  oCliCxC:Close()
 
   oBtn:cToolTip:="Cerrar Consulta"
 
-  oCliCxC:oBrw:SetColor(0,14217982)
-  oCliCxC:oBrw:GoBottom()
-
-  @ 0.1,56 SAY " "+oCliCxC:cCodigo OF oBar BORDER SIZE 395,18
-  @ 1.4,56 SAY " "+oCliCxC:cNombre OF oBar BORDER SIZE 395,18
+  oCliCxC:oBrw:SetColor(0,oDp:nClrPane1)
+  oCliCxC:oBrw:GoTop()
 
   oBar:SetColor(CLR_BLACK,oDp:nGris)
-  AEVAL(oBar:aControls,{|o,n|o:SetColor(CLR_BLACK,oDp:nGris)})
+
+  nLin:=32
+
+  AEVAL(oBar:aControls,{|o,n|o:SetColor(CLR_BLACK,oDp:nGris),nLin:=nLin+o:nWidth()})
+  
+  DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 BOLD 
+
+  @ 01,nLin SAY " "+oCliCxC:cCodigo OF oBar BORDER SIZE 395,18 COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont PIXEL
+  @ 22,nLin SAY " "+oCliCxC:cNombre OF oBar BORDER SIZE 395,18 COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont PIXEL
 
 RETURN .T.
 
@@ -321,7 +408,7 @@ FUNCTION VIEW()
 
    cFile:="DPXBASE\DPDOCCLI"+oCliCxC:cTipDoc+"CON"
 
-   IF FILE(cFile+".DXB")
+   IF FILE(cFile+".DXBX")
       EJECUTAR("DPDOCCLI"+oCliCxC:cTipDoc+"CON",NIL,cCodSuc,cTipDoc,cNumero,oCliCxC:cCodigo)
    ELSE
       EJECUTAR("DPDOCCLIFAVCON",NIL,cCodSuc,cTipDoc,cNumero,oCliCxC:cCodigo)
@@ -329,8 +416,11 @@ FUNCTION VIEW()
 
 RETURN .T.
 
+FUNCTION VERDOCCLI()
+  LOCAL aLine  :=oCliCxC:oBrw:aArrayData[oCliCxC:oBrw:nArrayAt]
+  LOCAL cTipDoc:=aLine[1],cNumero:=aLine[2],cCodigo:=oCliCxC:cCodigo
 
-
+RETURN EJECUTAR("VERDOCCLI",oCliCxC:cCodSuc,cTipDoc,cCodigo,cNumero)
 // EOF
 
 

@@ -15,6 +15,12 @@ PROCE MAIN(cCodCli)
    // Ubicamos al Proveedor con RIF Vacios
    */
 
+oDp:lCliToRif:=.F.
+
+   IF !oDp:lCliToRif .AND. Empty(cCodCli)
+      RETURN .F.
+   ENDIF
+
    CursorWait()
 
 IF Empty(cCodCli)
@@ -75,7 +81,7 @@ IF Empty(cCodCli)
    // Genera incidencias cuando trata de ser importado, recomendacion, realizar una copia en la tabla, aplicarle un correlativo y luego migrarla hacia adaptapro.
    // 
 
-   WHILE !oTable:Eof() .AND. .F.
+   WHILE !oTable:Eof() .AND. oDp:lCliToRif
 
       oRif:=OpenTable("SELECT DPCLIENTES.CLI_CODIGO,DPCLIENTES.CLI_RIF FROM DPCLIENTES WHERE DPCLIENTES.CLI_RIF"+GetWhere("=",oTable:CLI_RIF),.T.)
       oRif:Execute("SET FOREIGN_KEY_CHECKS = 0")
@@ -161,15 +167,31 @@ ENDIF
 // oTable:Browse()
 // oTable:End()
 
-   oRif  :=OpenTable("SELECT * FROM DPRIF",.F.)
+   // oRif  :=OpenTable("SELECT * FROM DPRIF",.F.)
+   oRif:=OpenTable("DPRIF",.F.)
+   oRif:SetInsert(100)
 
-   WHILE !oTable:Eof()
+   WHILE !oTable:Eof() .AND. oDp:lCliToRif
 
 
-        IF Empty(cCodCli)
-          DpMsgSet(oTable:Recno(),.T.,NIL,"Cliente:"+oTable:CLI_CODIGO+" "+LSTR(oTable:RecNo())+"/"+LSTR(oTable:RecCount()))
+        cRif:=oTable:CLI_RIF
+
+        IF Empty(cCodCli) .AND. oTable:Recno()%40=0
+          DpMsgSet(oTable:Recno(),.T.,NIL,"Cliente:"+oTable:CLI_CODIGO+" "+LSTR(RATA(oTable:RecNo()),oTable:RecCount()))
         ENDIF
 
+  
+        oRif:AppendBlank()
+        oRif:Replace("RIF_ID"  ,cRif)
+        oRif:Replace("RIF_CLIENTE",.T.)
+        oRif:Replace("RIF_TIPPER",oTable:CLI_TIPPER)
+        oRif:Replace("RIF_RESIDE",oTable:CLI_RESIDE="S" .OR. Empty(oTable:CLI_RESIDE))
+        oRif:Replace("RIF_NOMBRE",oTable:CLI_NOMBRE)
+        oRif:lAuditar:=.F.
+        oRif:Commit()
+
+
+/*
         cRif:=STRTRAN(oTable:CLI_RIF,"-","")
         cRif:=STRTRAN(cRif          ," ","")
         cRif:=STRTRAN(cRif          ,".","")
@@ -215,6 +237,7 @@ ENDIF
           /// SQLUPDATE("DPRIF",{"RIF_CLIENTE","RIF_TIPPER","RIF_RESIDE","RIF_NOMBRE"},{.T.,oTable:CLI_TIPPER,oTable:CLI_RESIDE="S" .OR. Empty(oTable:CLI_RESIDE),oTable:CLI_NOMBRE},"RIF_ID"+GetWhere("=",cRif))
 
         ENDIF
+*/
 
         oTable:DbSkip()
 

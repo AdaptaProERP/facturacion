@@ -86,7 +86,8 @@ PROCE MAIN(oFrm,cCodCli)
 
    NEXT I
 
-   ASORT(aTipDoc,,, { |x, y| DTOS(x[5])<DTOS(y[5])})
+// ViewArray(aTipDoc)
+//   ASORT(aTipDoc,,, { |x, y| DTOS(x[5])<DTOS(y[5])})
 
    FOR I=1 TO LEN(aTipDoc)
 
@@ -134,7 +135,6 @@ PROCE MAIN(oFrm,cCodCli)
    SetScript("DPCLIENTESCON")
 
    oMdiCli:Windows(0,0,aCoors[3]-180,415)  
-
 
   @ 48, -1 OUTLOOK oMdiCli:oOut ;
        SIZE 150+250, oMdiCli:oWnd:nHeight()-95 ;
@@ -225,7 +225,7 @@ JN 04/09/2014 (Este programa no esta concluido)
               BITMAP "BITMAPS\SUCURSAL.BMP";
               PROMPT "CXC de Sucursales";
               ACTION (oMdiCli:REGAUDITORIA("CXC de Sucursales"),;
-                      EJECUTAR("BRCXCSUCCLI",oMdiCli:cCodCli,"DOC_CODIGO"+GetWhere("=",oMdiCli:cCodCli)))
+                      EJECUTAR("BRCXCSUCCLI",NIL,NIL,NIL,NIL,NIL,NIL,oMdiCli:cCodCli))
 
      
 
@@ -567,9 +567,6 @@ ENDIF
 
     ENDIF
 
-
-
-
     DEFINE BITMAP OF OUTLOOK oMdiCli:oOut ;
           BITMAP "BITMAPS\CHEQUE.BMP" ;
           PROMPT "Buscar Cheques" ;
@@ -622,7 +619,7 @@ ENDIF
            ACTION (oMdiCli:REGAUDITORIA("Conciliación Contables"),;
                   EJECUTAR("BRCONCTADOCCLI","MOC_CODAUX"+GetWhere("=",oMdiCli:cCodCli),NIL,12,oDp:dFchInicio,oDp:dFchCierre))
 
-DEFINE GROUP OF OUTLOOK oMdiCli:oOut PROMPT "&Ruta de Entrega y Pedidos"
+    DEFINE GROUP OF OUTLOOK oMdiCli:oOut PROMPT "&Ruta de Entrega y Pedidos"
 
 
     DEFINE BITMAP OF OUTLOOK oMdiCli:oOut ;   
@@ -636,6 +633,14 @@ DEFINE GROUP OF OUTLOOK oMdiCli:oOut PROMPT "&Ruta de Entrega y Pedidos"
            PROMPT "Diario de Ruta de Entrega y Pedidos" ;
            ACTION (oMdiCli:REGAUDITORIA("Diario de Ruta de Entrega y Pedidos"),;
                    EJECUTAR("BRRUTAXDIA","DRT_CODRUT"+GetWhere("=",oMdiCli:cCodRut),NIL,NIL,NIL,NIL," ["+oDp:XDPCLIENTES+" "+oMdiCli:cCodCli+"]"))
+
+   DEFINE GROUP OF OUTLOOK oMdiCli:oOut PROMPT "&Ventas"
+
+    DEFINE BITMAP OF OUTLOOK oMdiCli:oOut ;   
+           BITMAP "BITMAPS\sucursal.BMP" ;
+           PROMPT "Venta x Sucursales" ;
+           ACTION (oMdiCli:REGAUDITORIA("Venta Sucursales"),;
+                   EJECUTAR("BRSEMSUCCLIPES",nil,nil,nil,nil,nil,nil,oMdiCli:cCodCli))
 
    oMdiCli:Activate("oMdiCli:FRMINIT()") //,,"oMdiCli:oSpl:AdjRight()")
 
