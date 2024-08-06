@@ -20,18 +20,19 @@ PROCE MAIN(cTipDoc,cWhere,oDoc)
 
 
   // Impresora Fiscal
-   IF "BEMA"$oDp:cImpFiscal
+
+  IF "BEMA"$oDp:cImpFiscal .AND. !oDp:lImpFisModVal
 
       // toma el número fiscal como número fiscal
       cNumero:=IF(ValType(oDoc)="O",oDoc:DOC_NUMFIS,"")
        
       IF Empty(cNumero)
 
-        IF cTipDoc="FAV"
+        IF cTipDoc="FAV" .OR. cTipDoc="TIK"
            cNumero:=EJECUTAR("DLL_BEMATECH_FAV")
         ENDIF
 
-        IF cTipDoc="CRE"
+        IF cTipDoc="CRE" .OR. cTipDoc="DEV"
            cNumero:=EJECUTAR("DLL_BEMATECH_CRE")
         ENDIF
 
@@ -105,12 +106,10 @@ PROCE MAIN(cTipDoc,cWhere,oDoc)
    cNumMax:=RIGHT(cNumMax,nLen)
    cNumero:=IF(cNumero<cNumMax,cNumMax,cNumero)
 
-//  ? cNumMax,cNumero,nLen,"nLen"
-
-   IF (cTipDoc="DEV" .OR. cTipDoc="TIK") .AND. !Empty(oDp:cTkSerie)
+   IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
       cNumero:=cNumMax
       // nLen   :=10-LEN(ALLTRIM(oDp:cTkSerie))
-
+      nLen   :=nLen-LEN(oDp:cTkSerie)
       cNumero:=RIGHT(cNumero,nLen)
       cNumero:=ALLTRIM(oDp:cTkSerie)+STRZERO(VAL(cNumero)+1,nLen)
 

@@ -14,18 +14,23 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
 
     DEFAULT cTipDoc:="FAV"
 
+// ? oDp:cImpFiscal,"oDp:cImpFiscal",oDp:lImpFisModVal,"oDp:lImpFisModVal,DPDOCCLIGETNUMFIS"
+
     // Impresora Fiscal
-    IF "BEMA"$oDp:cImpFiscal
+    IF "BEMA"$oDp:cImpFiscal .AND. !oDp:lImpFisModVal
+
 
        IF Empty(cNumDoc)
        
-         IF cTipDoc="FAV"
+         IF cTipDoc="FAV" .OR. cTipDoc="TIK"
             cNumero:=EJECUTAR("DLL_BEMATECH_FAV")
          ENDIF
 
-         IF cTipDoc="CRE"
+         IF cTipDoc="CRE" .OR. cTipDoc="DEV"
             cNumero:=EJECUTAR("DLL_BEMATECH_CRE")
          ENDIF
+
+? cNumero,"cNumero FISCAL"
 
        ELSE
 
@@ -59,12 +64,25 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
       cNumAnt:=cNumFis
     ENDIF
 
-// ? cNumAnt,cNumFis,"->",cCodSuc,cSerie,cTipDoc,"cCodSuc,cSerie,cTipDoc"
+    // Impresora Fiscal
 
-    cWhere:=" DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
-            " DOC_SERFIS"+GetWhere("=",cSerie )+" AND "+;
-            "(DOC_NUMFIS"+GetWhere("<>",""    )+" AND "+;
-            " DOC_NUMERO"+GetWhere("<>",cOcho )+") AND "+;
+    IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
+
+       nLen   :=10
+       nLen   :=nLen-LEN(oDp:cTkSerie)
+       cNumFis:=LEFT(cNumFis,nLen)
+       cNumFis:=ALLTRIM(oDp:cTkSerie)+cNumFis
+
+       cNumAnt:=LEFT(cNumAnt,nLen)
+       cNumAnt:=ALLTRIM(oDp:cTkSerie)+cNumAnt
+
+    ENDIF
+
+
+  cWhere:=" DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
+          " DOC_SERFIS"+GetWhere("=",cSerie )+" AND "+;
+          "(DOC_NUMFIS"+GetWhere("<>",""    )+" AND "+;
+          " DOC_NUMERO"+GetWhere("<>",cOcho )+") AND "+;
             " DOC_TIPTRA"+GetWhere("=","D"    )
 
   // 15/06/2022
@@ -73,9 +91,7 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
           " DOC_NUMFIS"+GetWhere("<>",""    )+" AND "+;
           " DOC_TIPTRA"+GetWhere("=","D"    )
 
-    cMax   :=SQLGET("DPDOCCLI","MAX(DOC_NUMFIS)",cWhere+" ORDER BY DOC_NUMFIS LIMIT 1")
-
-// ? cMax,"ULTIMO NUMERO",CLPCOPY(oDp:cSql)
+   cMax   :=SQLGET("DPDOCCLI","MAX(DOC_NUMFIS)",cWhere+" ORDER BY DOC_NUMFIS LIMIT 1")
 
     IF Empty(cMax) .AND. !Empty(cNumAnt)
        cMax:=cNumAnt
@@ -86,8 +102,6 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
     WHILE ++nContar<100
 
        cMax:=EJECUTAR("DPINCREMENTAL",cMax)
-
-// ? cMax,"cMax, Incrementador"
 
        IF !ISSQLFIND("DPDOCCLI",cWhere+" AND DOC_NUMFIS"+GetWhere("=",cMax))
           EXIT
@@ -118,7 +132,5 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
        cNumero:=DPINCREMENTAL(cNumero)
     ENDIF
  
-// ? cNumero,"cNumero, Obtenido"
-
 RETURN cNumero
 // EOF
