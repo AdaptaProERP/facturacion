@@ -24,16 +24,21 @@ PROCE MAIN(cTipDoc,cWhere,oDoc)
   IF "BEMA"$oDp:cImpFiscal .AND. !oDp:lImpFisModVal
 
       // toma el número fiscal como número fiscal
-      cNumero:=IF(ValType(oDoc)="O",oDoc:DOC_NUMFIS,"")
+      cNumero:=IF(ValType(oDoc)="O",oDoc:DOC_NUMFIS,""    )
+      cSerie :=IF(ValType(oDoc)="O",oDoc:cLetra    ,cSerie)
+
+      IF !Empty(cSerie)
+         oDp:cImpLetra:=cSerie
+      ENDIF
        
       IF Empty(cNumero)
 
         IF cTipDoc="FAV" .OR. cTipDoc="TIK"
-           cNumero:=EJECUTAR("DLL_BEMATECH_FAV")
+           cNumero:=EJECUTAR("DLL_BEMATECH_FAV",nil,nil,oDp:cImpLetra)
         ENDIF
 
         IF cTipDoc="CRE" .OR. cTipDoc="DEV"
-           cNumero:=EJECUTAR("DLL_BEMATECH_CRE")
+           cNumero:=EJECUTAR("DLL_BEMATECH_CRE",nil,nil,oDp:cImpLetra)
         ENDIF
 
       ENDIF
@@ -106,7 +111,8 @@ PROCE MAIN(cTipDoc,cWhere,oDoc)
    cNumMax:=RIGHT(cNumMax,nLen)
    cNumero:=IF(cNumero<cNumMax,cNumMax,cNumero)
 
-   IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
+   //  IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
+   IF (cTipDoc="DEV" .OR. cTipDoc="TIK") .AND. !Empty(oDp:cTkSerie)
       cNumero:=cNumMax
       // nLen   :=10-LEN(ALLTRIM(oDp:cTkSerie))
       nLen   :=nLen-LEN(oDp:cTkSerie)

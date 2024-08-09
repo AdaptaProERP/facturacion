@@ -19,18 +19,17 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
     // Impresora Fiscal
     IF "BEMA"$oDp:cImpFiscal .AND. !oDp:lImpFisModVal
 
-
        IF Empty(cNumDoc)
+
+         oDp:cImpLetra:=cSerie //8/8/2024
        
          IF cTipDoc="FAV" .OR. cTipDoc="TIK"
-            cNumero:=EJECUTAR("DLL_BEMATECH_FAV")
+            cNumero:=EJECUTAR("DLL_BEMATECH_FAV",nil,nil,oDp:cImpLetra)
          ENDIF
 
          IF cTipDoc="CRE" .OR. cTipDoc="DEV"
-            cNumero:=EJECUTAR("DLL_BEMATECH_CRE")
+            cNumero:=EJECUTAR("DLL_BEMATECH_CRE",nil,nil,oDp:cImpLetra)
          ENDIF
-
-? cNumero,"cNumero FISCAL"
 
        ELSE
 
@@ -65,8 +64,9 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
     ENDIF
 
     // Impresora Fiscal
+    // IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
 
-    IF (cTipDoc="DEV" .OR. cTipDoc="TIK" .OR. cTipDoc="FAV" .OR. cTipDoc="CRE") .AND. !Empty(oDp:cTkSerie)
+    IF (cTipDoc="DEV" .OR. cTipDoc="TIK") .AND. !Empty(oDp:cTkSerie)
 
        nLen   :=10
        nLen   :=nLen-LEN(oDp:cTkSerie)
