@@ -8,10 +8,28 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(oDoc)
+PROCE MAIN(oDoc,lReset)
   LOCAL nAltoBtn:=40 // area botones y totales del pago
 
-//  oDp:oFrameDp:SetText(LSTR(oDoc:oFolder:nOption),"OPTION")
+  DEFAULT lReset:=.F.
+
+  IF lReset .AND. LEN(oDoc:oFolder:aDialogs)>4
+
+     oDoc:nMtoPag     :=0
+     oDoc:nMtoIGTF    :=0
+     oDoc:nMtoReqBSD  :=0 
+     oDoc:nMtoReqUSD  :=0 // Necesario para PRE-GRABAR
+
+     AEVAL(oDoc:oBrwPag:aArrayData,{|a,n| oDoc:oBrwPag:aArrayData[n,03]:=0,;
+                                          oDoc:oBrwPag:aArrayData[n,04]:=0,;
+                                          oDoc:oBrwPag:aArrayData[n,05]:=0,;
+                                          oDoc:oBrwPag:aArrayData[n,12]:=0})
+
+     oDoc:oFolder:SetOption(1)
+
+     RETURN .T.
+
+  ENDIF
 
   IF Empty(oDocCli:aSizeFolder)
      oDocCli:aSizeFolder:={oDoc:oFolder:nTop(),0,oDoc:oFolder:nWidth(),oDoc:oFolder:nHeight()}
@@ -29,7 +47,11 @@ PROCE MAIN(oDoc)
   
        oDoc:nMtoDoc:=oDoc:DOC_NETO 
        oDoc:oBrwPag:SETSUGERIDO()
-       oDoc:oBrwPag:SetSize(oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)
+
+       oDoc:oBrwPag:Move(40,0,oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)
+       oDoc:oBrwPag:SetColor(0,oDp:nClrPane1)
+
+//     oDoc:oBrwPag:SetSize(oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)
      ENDIF
 
   ENDIF

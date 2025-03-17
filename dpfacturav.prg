@@ -23,6 +23,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   LOCAL lMoneta   :=.F.,nAt,lIVA,cImpFis:="",cModFis:=""
   LOCAL oDefCol   :=NIL,oBtn
   LOCAL oData,nFontSize,lDivisa // 31/07/2023 Documento creado totalmente en Divisa
+  LOCAL aDataPagos:={}
 
 
   IF !lPesado
@@ -63,6 +64,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
     RETURN EJECUTAR("DOCCLIANT",cCodSuc,cTipDoc,cNumeroD)
   ENDIF
 
+  
   DEFAULT oDp:nInvLotes:=COUNT("DPINV","INV_METCOS"+GetWhere("=","L")+" OR INV_METCOS"+GetWhere("=","C"))
 
   EJECUTAR("INVGETUNDMED","",.T.)
@@ -93,10 +95,6 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
   ENDIF
 
-  /*
-  //ViewArray(oDp:aMonedas)
-  */
-
   oDp:aVarL:={}
 
   lLibVta  :=SQLGET("DPTIPDOCCLI","TDC_LIBVTA,TDC_SERIEF,TDC_EXIVAL,TDC_LBXEXI,TDC_MONETA,TDC_IVA,TDC_MONEDA","TDC_TIPO"+GetWhere("=",cTipDoc))
@@ -125,6 +123,11 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      ENDIF
 
   ENDIF
+
+  IF !lView .AND. cTipDoc<>"PLA"
+    aDataPagos:=EJECUTAR("DPFACTURAV_ADATAPAGO")
+  ENDIF
+
 
   IF !lLibVta 
      cSerieF:=""
@@ -164,6 +167,14 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
   IF !Empty(cLetra) .AND. lLibVta .AND. !lView
 
+     IF cLetra<"00" .OR. cLetra>"99"
+        EJECUTAR("RUNPDF","Series_Fiscales_para_Documentos_del_Cliente.pdf")
+        // EJECUTAR("WEBRUN","https://adaptaproerp.com/series-fiscales/",.f.)
+        MsgMemo("Serie Fiscal ["+cLetra+"] Inválida para realizar documentos fiscales","Ejecute la Implementación de la Serie Fiscal")
+        DPLBX("DPSERIEFISCAL.LBX")
+        RETURN NIL
+     ENDIF
+
      cSerieF        :=SQLGET("DPSERIEFISCAL","SFI_MODELO,SFI_IMPFIS,SFI_PUERTO,SFI_PAGADO,SFI_ACTIVO","SFI_LETRA"+GetWhere("=",cLetra)+" AND SFI_ACTIVO=1")
      oDp:cModSerFis :=cSerieF // Modelo Serie Fiscal
      cImpFiscal     :=ALLTRIM(UPPER(DPSQLROW(2,"")))
@@ -184,10 +195,17 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
      cModSer    :=cImpFiscal // cSerie
 
-     IF !Empty(oDp:cImpFisCom) .OR. "DIG"$cImpFiscal 
+     IF !("-NOFISCAL"$oDp:cImpFisCom)
+       //  .OR. "DIG"$cImpFiscal 
        EJECUTAR("DPSERIEFISCALLOAD","SFI_LETRA"+GetWhere("=",cLetra))
      ENDIF
 
+  ENDIF
+
+  IF Empty(cLetra) .AND. ISDOCFISCAL(cTipDoc)
+     MsgMemo("Documento Fiscal "+cTipDoc+" Requiere Asociación con Serie fiscal")
+     DPLBX("DPTIPDOCCLI.LBX",NIL,"TDC_TIPO"+GetWhere("=",cTipDoc))
+     RETURN NIL
   ENDIF
 
   IF !Empty(cModSer)
@@ -195,9 +213,9 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      cModSer:=ALLTRIM(cModSer)
 
      IF "_FISCAL"$cImpFiscal
-       cTitle :=cTitle+" [ Serie "+cLetra+"="+ALLTRIM(oDp:cModSerFis)+" / "+cImpFiscal+" "+oDp:cImpFisCom+" ]"
+       cTitle :=cTitle+" [ Serie "+cLetra+"="+ALLTRIM(oDp:cModSerFis)+" Medio="+cImpFiscal+" Puerto:"+oDp:cImpFisCom+" ]"
      ELSE
-       cTitle :=cTitle+" [ Serie "+cLetra+"="+ALLTRIM(oDp:cModSerFis)+" / "+cImpFiscal+"]"
+       cTitle :=cTitle+" [ Serie "+cLetra+"="+ALLTRIM(oDp:cModSerFis)+" Medio="+cImpFiscal+"]"
      ENDIF
 
   ELSE
@@ -322,11 +340,11 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   oDocCli:oScroll      :=NIL
   oDocCli:cDesFij      :=""
   oDocCli:oBrwPag      :=NIL
-  oDocCli:cConfirma    :="CONFORME" // 
-  
+ 
   oDocCli:nBtnWidth   :=oDp:nBtnWidth  +2 // 10
   oDocCli:nBtnHeight  :=oDp:nBarnHeight-9
   oDocCli:lBtnText    :=.T. // oDp:lBtnText
+  oDocCli:lPagosFolder:=.T. // Pagos en el folder
 
   oDocCli:ADD("DOC_NUMGTR","")
 
@@ -398,6 +416,11 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   oDocCli:cDocDes      :=IF("NINGUN"$UPPER(oDocCli:cDocDes) .OR. oDocCli:cDocDes==cTipDoc ,"",cDocDes)
   oDocCli:lChkIntRef   :=.F.          // 27/2/25 no valida integridad referencial con condicion de pago vacio 27/02/2025
   oDocCli:cFieldUsuario:="DOC_USUARI" // 27/2/25 Necesario para el Disparador
+  oDocCli:aDataPagos   :=ACLONE(aDataPagos)
+  oDocCli:oBrwPag      :=NIL
+  oDocCli:nMtoIGTF     :=0
+  oDocCli:nTotal       :=0
+
 
   oDocCli:SETOTROSDATOS()
 
@@ -413,6 +436,9 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
   oDocCli:cPicDoc    :=oDp:Get(cTipDoc+"PICTUR")
   oDocCli:cPicFis    :=oDp:Get(cTipDoc+"PICFIS")
+
+  oDocCli:lValSerfiscal:=.F. // Valida si tiene Series Fiscales
+
 
   IF lView
     oDocCli:cPicDoc:=SQLGET("DPTIPDOCCLI","TDC_PICTUR,TDC_PICFIS","TDC_TIPO"+GetWhere("=",cTipDoc))
@@ -452,7 +478,14 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
   EJECUTAR("DPDOCCLIPAR",oDocCli,cTipDoc)
 
-  
+  oDocCli:cConfirma    :=""
+
+  IF ISDOCFISCAL(cTipDoc)
+     oDocCli:lPar_EditNum:=.F. // no puede modificar numero del documento
+     oDocCli:lPar_Fecha  :=.F. // no puede modificar la fecha
+     oDocCli:cConfirma:="CONFORME"
+  ENDIF
+
   oDocCli:lLimite     :=.F.  // Documento con Limites
   oDocCli:lPagEle     :=.F.  // Pago en formas electrónica
   oDocCli:nLimite     :=0    // Limite del Monto
@@ -533,21 +566,18 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
           "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
           "DOC_TIPTRA"+GetWhere("=","D")
 
-// Obtiene Numero de Documento Cuando No es Impresora Epson
-// 05/02/2023
-// Numero Impresora Epson debe guardarlo cuando imprime
-// IF oDocCli:nEpson=0
-//   oDocCli:SetIncremental("DOC_NUMERO",cScope,oDp:Get(cTipDoc+"NUMERO"))
-// ENDIF
+  // Obtiene Numero de Documento Cuando No es Impresora Epson
+  // 05/02/2023
+  // Numero Impresora Epson debe guardarlo cuando imprime
+  // IF oDocCli:nEpson=0
+  //   oDocCli:SetIncremental("DOC_NUMERO",cScope,oDp:Get(cTipDoc+"NUMERO"))
+  // ENDIF
 
   // 06/07/2024 innecesario, lo utiliza DOCNUMFIS
   //  oDocCli:SetIncremental("DOC_NUMERO",cScope,oDp:Get(cTipDoc+"NUMERO"))  
 
-  oDocCli:SetMemo("DOC_NUMMEM","Descripción Amplia")
-
-  IF DPVERSION()>4
-    oDocCli:SetAdjuntos("DOC_FILMAI") // Vinculo con DPFILEEMP
-  ENDIF
+  oDocCli:SetMemo("DOC_NUMMEM","Memo ->Descripción Amplia")
+  oDocCli:SetAdjuntos("DOC_FILMAI") // Vinculo con DPFILEEMP
 
   AEVAL(oDp:aVarL,{|a,n| oDocCli:Add("l"+a[1],.t.)})
 
@@ -560,38 +590,29 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
 
     oDocCli:AddBtnEdit("RETIVA.BMP","Validar RIF","(oDocCli:nOption=1 .OR. oDocCli:nOption=3 )","oDocCli:VALRIF()","OTHER")
 
+    oDocCli:AddBtnEdit("XEDIT.BMP","Nombre","(oDocCli:nOption=1 .OR. oDocCli:nOption=3 )","oDocCli:VALNOMBRE()","OTHER")
+
 
   ENDIF
 
-IF !(cTipDoc="PLA" .OR. !oDocCli:lMoneta)
+  IF !(cTipDoc="PLA" .OR. !oDocCli:lMoneta)
 
-
-  oDocCli:AddBtnEdit("xpeople2.bmp","Cliente Genérico","(oDocCli:nOption=1 .OR. oDocCli:nOption=3) .AND. oDocCli:DOC_CODIGO=STRZERO(0,10)",;
-                                     "EJECUTAR('DPCLIENTESCERO',oDocCli,oDocCli:oDoc_CODIGO)","CLI")
-ELSE
+    oDocCli:AddBtnEdit("xpeople2.bmp","Cliente Genérico","(oDocCli:nOption=1 .OR. oDocCli:nOption=3) .AND. oDocCli:DOC_CODIGO=STRZERO(0,10)",;
+                                       "EJECUTAR('DPCLIENTESCERO',oDocCli,oDocCli:oDoc_CODIGO)","CLI")
+  ELSE
 
 
     oDocCli:AddBtn("RUN.bmp","Crear Documento (Ctrl-P)","(oDocCli:nOption=0)",;
                    "oDocCli:CREARPLANTILLA()","CLI",,STR(DP_CTRL_P))
 
-//    oDocCli:BtnSetMnu("BROWSE","Pendientes de Pago"   ,"BRWXPAG")  // Por Pago
-//    oDocCli:BtnSetMnu("BROWSE","Pagadas"              ,"BRWPAGD")  // Pagadas
-
-ENDIF
+  ENDIF
 
   oDocCli:lPELock:=.F. // Bloque el Botón en las Devoluciones Importadas
   oDocCli:lPagEle:=.F.
 
   EJECUTAR("DPFACTURAV10IVA",oDocCli)
-/*
-  IF  (oDp:dFecha>=oDp:dDesdePE .AND. oDp:dFecha<=oDp:dHastaPE)
 
-     oDocCli:AddBtnEdit("iva10%.bmp","Pago Electrónico","(oDocCli:nOption=1 .OR. oDocCli:nOption=3) .AND. !oDocCli:lPELock",;
-                        "oDocCli:SETIVA10()","CLI")
-
-  ENDIF
-*/
-IF lMoneta
+  IF lMoneta
 
   oDocCli:AddBtn("xexpediente.bmp","Gestión ->Expedientes (Ctrl-A)","(oDocCli:nOption=0)",;
                  "EJECUTAR('DPDOCCLIEXP',NIL,oDocCli:DOC_CODSUC,;
@@ -680,7 +701,10 @@ ENDIF
 
   oDocCli:lPagos:=.F.
 
-  IF oDp:Get(cTipDoc+"PAGOS")
+  IF oDp:Get(cTipDoc+"PAGOS") 
+
+     IF oDp:Get(cTipDoc+"CXC")<>0
+
 /*
     oDocCli:AddBtn("RECPAGO.bmp","Recibo ->Recepción de Pagos (Ctrl-R)","(oDocCli:nOption=0)",;
                          "EJECUTAR('DPDOCCLIMNU',oDocCli:DOC_CODSUC ,;
@@ -688,8 +712,16 @@ ENDIF
                                                  oDocCli:DOC_CODIGO ,;
                                                  oDocCli:cNomDoc , oDocCli:DOC_TIPDOC , oDocCli ,'RECIBO' )","CLI",,STR(DP_CTRL_O))
 */
-    oDocCli:AddBtn("RECPAGO.bmp","Recibo ->Recepción de Pagos (Ctrl-R)","(oDocCli:nOption=0)",;
-                         "oDocCli:RECIBO()","CLI",,STR(DP_CTRL_O))
+      oDocCli:AddBtn("RECPAGO.bmp","Recibo ->Recepción de Pagos (Ctrl-R)","(oDocCli:nOption=0)",;
+                     "oDocCli:RECIBO()","CLI",,STR(DP_CTRL_O))
+
+    ELSE
+
+      oDocCli:AddBtn("RECPAGO.bmp","Anticipo ->Recepción de Pagos (Ctrl-R)","(oDocCli:nOption=0)",;
+                      "oDocCli:RECIBO()","CLI",,STR(DP_CTRL_O))
+
+
+    ENDIF
 
     oDocCli:lPagos:=.T.
 
@@ -703,15 +735,15 @@ ENDIF
 
   IF oDp:Get(cTipDoc+"CXC")<>0
 
-    oDocCli:AddBtn("CONTABILIDAD.bmp","Contabilizar","(oDocCli:nOption=0)",;
+    oDocCli:AddBtn("CONTABILIDAD.bmp","Asientos ->Contabilizar","(oDocCli:nOption=0)",;
                    "EJECUTAR('DPDOCCLICONTAB',oDocCli)","CLI")
 
 
   ENDIF
 
-  IF .F.
+  IF !ISDOCFISCAL(cTipDoc)
 
-  oDocCli:AddBtn("paste.bmp","Replicar Documento (Ctrl-R)","(oDocCli:nOption=0)",;
+    oDocCli:AddBtn("paste.bmp","Replicar Documento (Ctrl-R)","(oDocCli:nOption=0)",;
                    "EJECUTAR('DPDOCCLIREPLIFRM',oDocCli:DOC_CODSUC,;
                                                 oDocCli:DOC_TIPDOC,;
                                                 oDocCli:DOC_CODIGO,;
@@ -721,49 +753,41 @@ ENDIF
 
   oDocCli:cList:=NIL // AG20080401
 
-//  @ 1, 1.0 GROUP oDocCli:oGroup TO 10,10
-
   @ 14,0 SAYREF oDocCli:oSayNeto PROMPT IF(oDocCli:DOC_VALCAM<>1 .AND. !oDocCli:lDivisa,ALLTRIM(TRAN(ROUND(oDocCli:DOC_NETO/oDocCli:DOC_VALCAM,2),"99,999,999,999.99"))+"("+LEFT(oDocCli:DOC_CODMON,3)+")","")+" Neto" RIGHT SIZE 42,12 FONT oFontB RIGHT
 
   SayAction(oDocCli:oSayNeto,{||oDocCli:TOTALIZAR()})
 
-//oSayDesc:bAction:={||oDocCli:TOTALIZAR()}
 
+  IF cTipDoc="PLA" .OR. !oDocCli:lMoneta
 
-IF cTipDoc="PLA" .OR. !oDocCli:lMoneta
+    EJECUTAR("DPFACTURAV_PLA",oDocCli)
 
-  EJECUTAR("DPFACTURAV_PLA",oDocCli)
+  ELSE
 
-ELSE
+    DPFACTURAV_HEAD()
 
-  DPFACTURAV_HEAD()
+    SETFOLDER( 2)
 
-  SETFOLDER( 2)
+    oDocCli:oScroll:=oDocCli:SCROLLGET("DPDOCCLI",oDocCli:cFileScg,cExcluye)
 
-  oDocCli:oScroll:=oDocCli:SCROLLGET("DPDOCCLI",oDocCli:cFileScg,cExcluye)
+    IF oDocCli:IsDef("oScroll")
+     oDocCli:oScroll:SetEdit(.F.)
+    ENDIF
 
-  IF oDocCli:IsDef("oScroll")
-    oDocCli:oScroll:SetEdit(.F.)
+    IIF(Empty(oDp:cModeVideo),oDocCli:oScroll:SetColSize(180,250,298),oDocCli:oScroll:SetColSize(230,290,320))
+
+    oDocCli:oScroll:SetColorHead(CLR_BLACK,oDp:nLbxClrHeaderPane,oFontB)
+
+    oDocCli:oScroll:SetColor(16773862 , CLR_BLUE  , 1 , 16771538 , oFontB) 
+    oDocCli:oScroll:SetColor(16773862 , CLR_BLACK , 2 , 16771538 , oFont ) 
+    oDocCli:oScroll:SetColor(16773862 , CLR_GRAY  , 3 , 16771538 , oFont ) 
+
+    EJECUTAR("DPFACTURAV_OTROS"   ,oDocCli)
+    EJECUTAR("DPFACTURAV_TERCEROS",oDocCli)
+
+    SETFOLDER( 0)
+
   ENDIF
-
-  IIF(Empty(oDp:cModeVideo),oDocCli:oScroll:SetColSize(180,250,298),oDocCli:oScroll:SetColSize(230,290,320))
-
-  oDocCli:oScroll:SetColorHead(CLR_BLACK,oDp:nLbxClrHeaderPane,oFontB)
-
-//  oDocCli:oScroll:SetColor(oDp:nClrPane1,0,1,oDp:nClrPane2,oFontB)
-//  oDocCli:oScroll:SetColor(oDp:nClrPane1,CLR_BLACK,3,oDp:nClrPane2,oFontB)
-//  oDocCli:oScroll:SetColor(oDp:nClrPane2,CLR_BLACK,2,oDp:nClrPane2,oFont)
-
-  oDocCli:oScroll:SetColor(16773862 , CLR_BLUE  , 1 , 16771538 , oFontB) 
-  oDocCli:oScroll:SetColor(16773862 , CLR_BLACK , 2 , 16771538 , oFont ) 
-  oDocCli:oScroll:SetColor(16773862 , CLR_GRAY  , 3 , 16771538 , oFont ) 
-
-  EJECUTAR("DPFACTURAV_OTROS"   ,oDocCli)
-  EJECUTAR("DPFACTURAV_TERCEROS",oDocCli)
-
-  SETFOLDER( 0)
-
-ENDIF
 
   oDocCli:oNeto     :=NIL
   oDocCli:oDOCBASNET:=NIL
@@ -1869,6 +1893,24 @@ FUNCTION LOAD()
  ENDIF
 
  IF oDocCli:nOption=1
+
+   EJECUTAR("DPFACTURAV_SETFOLDER",oDocCli,.T.) // Debe resetear el pago
+
+   oDocCli:nMtoIGTF   :=0 // RECIBO DE INGRESO
+   oDocCli:nTotal     :=0 // RECIBO DE INGRESO
+
+   oDocCli:DOC_CODSUC:=oDocCli:cCodSuc
+   oDocCli:DOC_TIPDOC:=oDocCli:cTipDoc
+
+   IF !oDocCli:lValSerfiscal .AND. !EJECUTAR("ISDPSERIEFISCAL_NUM",oDocCli:DOC_CODSUC,oDocCli:cLetra,oDocCli:DOC_TIPDOC)
+      // no tiene series fiscales
+      oDocCli:nOption:=0
+      oDocCli:Cancel()
+      oDocCli:LoadData(0)
+      RETURN .F.
+   ENDIF
+
+   oDocCli:lValSerfiscal:=.T. // evita volver a Validarlo
 
    // oDocCli:DOC_NUMACT:=oDocCli:DOC_NUMERO // NUMERO DE FACTURA ACTUAL, CASO DE IMPRESORA FISCAL
    oDocCli:DOC_MTOCOM:=0 // necesario para CxC en divisas
@@ -3438,12 +3480,14 @@ FUNCTION DPFACTURAV_HEAD()
 
   cTitle:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
  
-//  IF oDp:nVersion>=6
-     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles","Datos Adicionales/Fletes","Terceros" OF oDocCli:oDlg SIZE 490,61
-//  ELSE
-//     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles" OF oDocCli:oDlg SIZE 490,61
-//  ENDIF
+  IF !oDp:cTipDoc="PLA"
+     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles","Datos Adicionales - Fletes","Terceros","Pago" OF oDocCli:oDlg SIZE 490,61
+  ELSE
+     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles" OF oDocCli:oDlg SIZE 490,61
+  ENDIF
 
+  oDocCli:aSizeFolder:={}
+  oDocCli:oFolder:bChange:={|| oDocCli:FOLDERCHANGE()}
   SETFOLDER( 1)
 
   // Nombre del Cliente
@@ -3613,7 +3657,7 @@ FUNCTION DPFACTURAV_HEAD()
      IF "BEMA"$oDp:cImpFiscal
        @ 3.0,80 SAY oDocCli:oDOC_NUMFIS PROMPT oDocCli:DOC_NUMFIS
      ELSE 
-       @ 3.0,80 SAY oDocCli:oDOC_NUMFIS PROMPT oDocCli:DOC_SERFIS+"-"+oDocCli:DOC_NUMFIS
+       @ 3.0,80 SAY oDocCli:oDOC_NUMFIS PROMPT oDocCli:DOC_SERFIS+"-"+RIGHT(oDocCli:DOC_NUMFIS,8)
      ENDIF
 
      @ 2,80 CHECKBOX oDocCli:oDOC_VTAANT  VAR  oDocCli:DOC_VTAANT;
@@ -3800,6 +3844,14 @@ FUNCTION VMOV_ALMORG()
 RETURN .T.
 
 FUNCTION CONFORME()
-  LOCAL lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO)
+  LOCAL lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO,oDocCli:DOC_CODIGO,oDocCli:DOC_SERFIS,oDocCli:cNomDoc)
 RETURN lResp
+
+FUNCTION VALNOMBRE()
+  EJECUTAR("DPCLIENTESEDITRIF",oDocCli:DOC_CODIGO,oDocCli:oDOC_CODIGO,NIL,oDocCli:oCliNombre)
+RETURN .T.
+
+FUNCTION FOLDERCHANGE()
+RETURN EJECUTAR("DPFACTURAV_SETFOLDER",oDocCli)
+
 // EOF

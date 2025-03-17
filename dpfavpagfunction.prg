@@ -8,12 +8,6 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(oBrw)
-
-  ? oBrw:ClassName(),"DPFACTURAVPAGFUNC"
-
-RETURN .t.
-
 FUNCTION RUNCLICK()
     LOCAL aLine:=oBrw:aArrayData[oBrw:nArrayAt]
     LOCAL oCol :=oBrw:aCols[4]
@@ -24,6 +18,18 @@ FUNCTION RUNCLICK()
 
 RETURN .T.
 
+/*
+// Resuelve el residio del calculo de la Divisa
+*/
+FUNCTION ADDRESIDUO(nExp,nValReq)
+   LOCAL nFraccion:=nExp-nValReq
+   
+   IF ABS(nFraccion)<1
+      nExp:=nValReq
+   ENDIF
+
+RETURN nExp
+
 FUNCTION BRWCHANGE()
 RETURN .T.
 
@@ -32,15 +38,22 @@ FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh)
   LOCAL aLine   :=oBrw:aArrayData[oBrw:nArrayAt]
   LOCAL aTotales:={}
   LOCAL nRowSel :=oBrw:nRowSel
+  LOCAL nMtoCal :=0
+  LOCAL nValReq :=oDoc:nMtoDoc
 
   DEFAULT lRefresh:=.T.,;
           nAt     :=oBrw:nArrayAt
 
-  oBrw:aArrayData[oBrw:nArrayAt,nCol]:=uValue
-  oBrw:aArrayData[oBrw:nArrayAt,5   ]:=ROUND(uValue*aLine[2],2)
+  nMtoCal:=ROUND(uValue*aLine[2],2)
 
+  oBrw:aArrayData[oBrw:nArrayAt,nCol]:=uValue
+
+  nMtoCal:=oBrw:ADDRESIDUO(nMtoCal,nValReq)
+  oBrw:aArrayData[oBrw:nArrayAt,5   ]:=nMtoCal // ROUND(uValue*aLine[2],2)
+
+  
   IF oDoc:nMtoIGTF=aLine[5] 
-     oBrw:aArrayData[oBrw:nArrayAt,11]:=0
+     // OJO NO PUEDE SER CEROoBrw:aArrayData[oBrw:nArrayAt,11]:=0
   ENDIF
 
   oBrw:aArrayData[oBrw:nArrayAt,oDoc:nColSelP]:=(uValue>0)
@@ -56,6 +69,17 @@ RETURN .T.
 FUNCTION SETSUGERIDO()
    LOCAL aData  :=oBrw:aArrayData,I,nAt:=oBrw:nArrayAt,nRowSel:=oBrw:nRowSel
    LOCAL nMtoSug:=0
+   LOCAL oBrwR  :=oDoc:oBrwR 
+
+   // sin valor divisa
+   IF oDoc:nValCam=1 .OR. oDoc:nValCam=0
+      nAt:=ASCAN(aData,{|a,n| a[7]=="DBC"})
+      IF nAt>0
+         oDoc:nValCam:=aData[nAt,2]
+      ENDIF
+   ENDIF
+
+   nAt:=oBrw:nArrayAt
 
    oDoc:nMtoIGTF:=0
    oBrw:CALIGTF(.T.)
@@ -79,7 +103,7 @@ FUNCTION SETSUGERIDO()
    FOR I=1 TO LEN(aData)
 
      IF aData[I,5]>0 .AND. aData[I,oDoc:nColPorITG]>0
-        aData[I,oBrw:nColMtoITG]:=PORCEN(aData[I,5],aData[I,oDoc:nColPorITG],2)
+        aData[I,oDoc:nColMtoITG]:=PORCEN(aData[I,5],aData[I,oDoc:nColPorITG],2)
      ELSE
         aData[I,oDoc:nColMtoITG]:=0
      ENDIF
@@ -136,103 +160,44 @@ FUNCTION SETSUGERIDO()
    oBrw:nArrayAt:=nAt
    oBrw:nRowSel :=nRowSel
 
-   IF ValType(oBrwR)="O"
-     oBrw:TOTALRESDIVISA(oBrw:aArrayData,oBrwR) // Resumen por Divisa
-   ENDIF
-
-   IF ValType(oDoc:oBtnSave)="O"
-      oDoc:oBtnSave:ForWhen(.T.)
-   ENDIF
-
 RETURN .T.
 
 FUNCTION TOTALRESDIVISA()
 RETURN NIL
 
 FUNCTION CALIGTF(lRefresh)
-
-  DEFAULT lRefresh:=.F.
-
-  oBrw:CALTOTAL()
-  
-RETURN .T.
-
-FUNCTION CALTOTAL(lRefresh)
-RETURN EJECUTAR("DPRECIBODIV_CALTOTAL",oDoc,lRefresh)
-
-FUNCTION TOTALRESDIVISA()
-   ? "TOTALRESDIVISA"
-RETURN .T.
-
-FUNCTION CALSUG(nMtoSug,nMoneda,cCodMon)
-    LOCAL nMonto:=0
-
-    oDoc:nValCam :=oDoc:DOC_VALCAM
-
-    IF cCodMon=oDp:cCodCop
-       nMonto:=EJECUTAR("CALCOP",nMtoSug,oDoc:nValCam)
-    ELSE
-       nMonto:=ROUND(nMtoSug/nMoneda,2)
-    ENDIF
-
-RETURN nMonto
-
-FUNCTION CALTOTAL(lRefresh)
    LOCAL aTotal:={},oCol,aTotalD
- 
-   aTotal          :=ATOTALES(oBrw:aArrayData)
+  
+   DEFAULT lRefresh:=.F.
 
-   oDoc:nMtoDoc   :=oDoc:DOC_NETO 
+   aTotal:=ATOTALES(oBrw:aArrayData)
 
    oDoc:nMtoDifCam:=0
    oDoc:nMtoIGTF  :=0
 
-   IF oDoc:lCruce
+   oDoc:nMtoIGTF:=ROUND(aTotal[oDoc:nColMtoITG] ,2)
 
-      // total debitos es la suma de los documentos seleccionados
-      oDoc:nMtoPag:=0
-      oDoc:nMtoDoc:=oDoc:DOC_NETO
-/*
-      AEVAL(oBrwD:aArrayData,{|a,n| oDoc:nMtoPag:=oDoc:nMtoPag+IF(a[9]>0,a[9]*+1,0),;
-                                            oDoc:nMtoDoc:=oDoc:nMtoDoc+IF(a[9]<0,a[9]*-1,0)})
-
-      oDoc:nTotal:=oDoc:nMtoPag-oDoc:nMtoDoc
-*/
-
-   ELSE
-
-      oDoc:nMtoIGTF:=ROUND(aTotal[oDoc:nColMtoITG] ,2)
-
-      IF !oDoc:lIGTF
-        oDoc:nMtoIGTF:=0
-      ENDIF
-
-      oDoc:nMtoPag :=ROUND(aTotal[05] ,2)
-
-/*
-      IF oDoc:cTipDes="OPA" .OR. oDoc:cTipDes="OIN"
-        oDoc:nMtoDoc :=ROUND(aTotalD[07+1],2)
-      ELSE
-        oDoc:nMtoDoc :=ROUND(aTotalD[09],2)
-      ENDIF
-*/
-
-      oDoc:nTotal :=ROUND(oDoc:nMtoPag-(oDoc:nMtoDoc+IF(oDoc:lIGTFCXC,0,oDoc:nMtoIGTF)),2)
-
-      oDoc:nTotal :=oDoc:nTotal - IF(oDoc:lDifAnticipo,oDoc:nMtoAnticipo,0) // Excede -> Anticipo
-
-      oDoc:nTotal :=INT(oDoc:nTotal*100)/100
-
-      // 17/03/2023 Si el total de pagos es 0, el total debe ser su valor invertido
-      IF oDoc:nMtoPag=0
-        oDoc:nTotal:=oDoc:nMtoDoc*-1
-      ENDIF
-
-      // oDoc:nMtoDifCam:=aTotalD[10]
-
+   IF !oDoc:lIGTF
+      oDoc:nMtoIGTF:=0
    ENDIF
 
-   oDoc:nTotal :=IF("-0.00"$LSTR(oDoc:nTotal,19,2),0.00,oDoc:nTotal)
+   // Total Documentos debe ser igual al monto del Documento, evitar residuos
+   aTotal[05]:=ADDRESIDUO(aTotal[05],oDoc:nMtoDoc)
+   
+   oDoc:nMtoPag:=ROUND(aTotal[05] ,2)
+
+   oDoc:nTotal :=ROUND(oDoc:nMtoPag-(oDoc:nMtoDoc+IF(oDoc:lIGTFCXC,0,oDoc:nMtoIGTF)),2)
+   oDoc:nTotal :=oDoc:nTotal - IF(oDoc:lDifAnticipo,oDoc:nMtoAnticipo,0) // Excede -> Anticipo
+   oDoc:nTotal :=INT(oDoc:nTotal*100)/100
+
+   // 17/03/2023 Si el total de pagos es 0, el total debe ser su valor invertido
+   IF oDoc:nMtoPag=0
+      oDoc:nTotal:=oDoc:nMtoDoc*-1
+   ENDIF
+
+   oDoc:nMtoDifCam:=0 // No hay diferencial cambiario aTotalD[10]
+
+   oDoc:nTotal    :=IF("-0.00"$LSTR(oDoc:nTotal,19,2),0.00,oDoc:nTotal)
 
    // Si cuadra documentos y pagos, la diferencia será el IGTF
    IF oDoc:nMtoPag=oDoc:nMtoDoc .AND. !oDoc:lIGTFCXC
@@ -250,18 +215,34 @@ FUNCTION CALTOTAL(lRefresh)
 
    oBrw:RefreshFooters()
 
-/*
-   oDoc:oMtoPag:Refresh(.t.)
-   oDoc:oMtoDoc:Refresh(.t.)
-   oDoc:oMtoIGTF:Refresh(.T.)
-   oDoc:oTotal:Refresh(.t.)
-*/
+   
 
-   IF ValType(oDoc:oBtnSave)="O"
-     oDoc:oBtnSave:ForWhen(.T.)
-   ENDIF
+   oDoc:nMtoDoc     :=oDoc:DOC_NETO+oDoc:nMtoIGTF
+
+
+   oDoc:nMtoReqBSD  :=oDoc:nMtoDoc-oDoc:nMtoPag             // monto requerido BS
+   oDoc:nMtoReqUSD  :=ROUND(oDoc:nMtoReqBSD/oDoc:nValCam,2) // monto requerido Divisa
+
+   oDoc:oPagosBSD:Refresh(.T.)
+   oDoc:oPagosUSD:Refresh(.T.)
+
+   oDoc:nTotal:=oDoc:nMtoReqBSD*-1
+
+//? oDoc:nTotal,oDoc:nMtoReqBSD,"oDoc:nMtoReqBSD"
+
 
 RETURN .T. 
+
+FUNCTION CALSUG(nMtoSug,nMoneda,cCodMon)
+    LOCAL nMonto:=0
+
+    IF cCodMon=oDp:cCodCop
+       nMonto:=EJECUTAR("CALCOP",nMtoSug,oDoc:nValCam)
+    ELSE
+       nMonto:=ROUND(nMtoSug/nMoneda,2)
+    ENDIF
+
+RETURN nMonto
 // EOF
 
 
