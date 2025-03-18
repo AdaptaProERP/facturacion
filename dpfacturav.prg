@@ -1850,10 +1850,10 @@ FUNCTION DOCCLIINI()
              FONT oFont;
              FILENAME "BITMAPS\CAJAS.BMP";
              TOP PROMPT "Caja";
-             ACTION MsgMemo("AQUI")
+             ACTION oDocCli:oBrwPag:SETCAJA(oDocCli:oBrwPag)
 
 
-      oBtn:cToolTip:="Clonar"
+      oBtn:cToolTip:="Instrumentos de Caja"
 
       DEFINE BUTTON oBtn;
              OF oDocCli:oBarPago;
@@ -1861,8 +1861,9 @@ FUNCTION DOCCLIINI()
              FONT oFont;
              FILENAME "BITMAPS\BANCO.BMP";
              TOP PROMPT "Banco";
-             ACTION MsgMemo("AQUI")
+             ACTION oDocCli:oBrwPag:SETBANCO(oDocCli:oBrwPag)
 
+      oBtn:cToolTip:="Instrumentos de Bancos"
 
       oDocCli:oBarPago:SetColor(CLR_BLACK,oDp:nGris)
       AEVAL(oDocCli:oBarPago:aControls,{|o,n| o:Move(4,o:nLeft(),42,40+2,.T.), ;

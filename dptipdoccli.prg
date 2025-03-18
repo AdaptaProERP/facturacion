@@ -10,16 +10,16 @@
 #INCLUDE "TSBUTTON.CH"
 #INCLUDE "IMAGE.CH"
 
-FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
+FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc,cCodSuc,cLetra)
   LOCAL oBtn,oTable,oGet,oFont,oFontB,oFontG
   LOCAL cTitle,cSql,cFile,cExcluye:="",cNumero:=REPLI("0",10),cSerie:=" ",cNumFis:=SPACE(10)
   LOCAL nClrText,nAt,oData
   LOCAL cTitle :="Documentos de Cliente"
   LOCAL aItems1:=GETOPTIONS("DPTIPDOCCLI","TDC_CXC")
-  LOCAL aSeries:=ASQL("SELECT SFI_MODELO FROM DPSERIEFISCAL WHERE SFI_CODSUC"+GetWhere("=",oDp:cSucursal)+" AND SFI_ACTIVO=1")
+  LOCAL aSeries:={} // ASQL("SELECT SFI_MODELO FROM DPSERIEFISCAL WHERE SFI_CODSUC"+GetWhere("=",oDp:cSucursal)+" AND SFI_ACTIVO=1")
   LOCAL aTipDoc:={},cDocDes:=SPACE(3),nAt
   LOCAL aDocs  :=ASQL("SELECT TDC_TIPO,TDC_DESCRI FROM DPTIPDOCCLI WHERE TDC_PRODUC=1 ORDER BY TDC_TIPO")
-  LOCAL aExi   :={},nAt
+  LOCAL aExi   :={},nAt,cWhere
 
   AADD(aDocs,{cDocDes,"Ninguno"})
 
@@ -27,20 +27,38 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
   AEVAL(aDocs, {|a,n|AADD(aTipDoc,ALLTRIM(a[1])),aDocs[n]:=a[2]+a[1]})
 
-  AADD(aSeries,{"Ninguno"})
-  AEVAL(aSeries,{|a,n|aSeries[n]:=a[1]})
+//  AADD(aSeries,{"Ninguno"})
+//  AEVAL(aSeries,{|a,n|aSeries[n]:=a[1]})
 
   cExcluye:=""
 
   DEFAULT cCodigo:="CUO",;
-          nOption:=3
+          nOption:=3,;
+          cCodSuc:=oDp:cSucursal,;
+          cLetra :=""
+
+  IF COUNT("DPSERIEFISCAL","SFI_CODSUC"+GetWhere("=",cCodSuc)+[ AND SFI_ACTIVO=1 AND SFI_LETRA<>" "])=0 
+     MsgMemo("Requiere Serie fiscal")
+     DPLBX("DPSERIEFISCAL.LBX")
+     RETURN .T.
+  ENDIF
+
+//  IF COUNT("DPSERIEFISCAL","SFI_CODSUC"+GetWhere("=",cCodSuc)+[ AND SFI_ACTIVO=1 AND SFI_LETRA<>" "])
+//   
+//  ENDIF
+
+
+  aSeries:=ASQL("SELECT SFI_MODELO FROM DPSERIEFISCAL WHERE SFI_CODSUC"+GetWhere("=",cCodSuc)+" AND SFI_ACTIVO=1")
+  //AADD(aSeries,{"Ninguno"}) Sustituido por NO-FISCAL
+  AEVAL(aSeries,{|a,n|aSeries[n]:=a[1]})
 
   cCodigo:=ALLTRIM(cCodigo)
 
+/*
   IF !EJECUTAR("ISFIELDMYSQL",NIL,"DPTIPDOCCLI","TDC_IMPTOT")
      EJECUTAR("DPCAMPOSADD","DPTIPDOCCLI"    ,"TDC_IMPTOT","L",01,0,"Exportación Total"    ,NIL,.T.,.F.,".F."  ) // Importación Total desde Documento Origen
   ENDIF
-
+*/
   cNumero:=IIF(Empty(cNumero),STRZERO(0,10),cNumero)
   cSerie :=IIF(Empty(cSerie )," "          ,cSerie )
   cNumFis:=IIF(Empty(cNumFis),STRZERO(0,10),cNumFis)
@@ -89,7 +107,9 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   oTIPDOCCLI:SetMemo("TDC_NUMMEM")                     // Campo para el Valor Memo
   oTIPDOCCLI:lEditFiscal:=SQLGET("DPSERIEFISCAL","SFI_EDITAB","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
   oTIPDOCCLI:lRunDoc    :=lRunDoc
+  oTIPDOCCLI:cCodSuc    :=cCodSuc
   oTIPDOCCLI:oEXI       :=NIL
+  oTIPDOCCLI:cLetra :=cLetra
 
   oTIPDOCCLI:aLbx    :={}
   oTIPDOCCLI:aLbxName:={}
@@ -157,25 +177,51 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   ELSE
 
      //  Busca los Valores por Sucursal
- 
-     oData  :=DATASET("SUC_V"+oDp:cSucursal,"ALL")
+
+     IF Empty(cLetra)
+        cLetra:=SQLGET("DPSERIEFISCAL","SFI_LETRA","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
+     ENDIF
+
+     cWhere :="TDN_CODSUC"+GetWhere("=",oTIPDOCCLI:cCodSuc )+" AND "+;
+              "TDN_TIPDOC"+GetWhere("=",oTIPDOCCLI:TDC_TIPO)
+
+     oData  :=OpenTable("SELECT * FROM dptipdocclinum WHERE "+cWhere)
+
+     oTIPDOCCLI:cNumero   :=oData:TDN_NUMERO
+     oTIPDOCCLI:TDC_SERIEF:=SQLGET("DPSERIEFISCAL","SFI_MODELO","SFI_LETRA"+GetWhere("=",oData:TDN_SERFIS))
+     oTIPDOCCLI:TDC_PICTUR:=oData:TDN_PICTUR
+
+//   oData:Browse()
+     oData:End()
+
+     oTIPDOCCLI:TDC_PICFIS:=SQLGET("DPSERIEFISCAL","SFI_PICTUR,SFI_NUMERO,SFI_ITEMXP","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
+     oTIPDOCCLI:cNumFis   :=DPSQLROW(2)
+     oTIPDOCCLI:TDC_NITEMS:=DPSQLROW(3)
+     oTIPDOCCLI:TDC_PICFIS:=IF(Empty(oTIPDOCCLI:TDC_PICFIS),"9999999999",oTIPDOCCLI:TDC_PICFIS)
+
+
+/* 
+     oData  :=DATASET("SUC_V"+cCodSuc,"ALL")
      oTIPDOCCLI:cNumero   :=oData:Get(oTIPDOCCLI:cTipDoc+"Numero",STRZERO(0,10))
      oTIPDOCCLI:TDC_SERIEF:=oData:Get(oTIPDOCCLI:cTipDoc+"Serie" ,"Libre" )
      oTIPDOCCLI:cNumFis   :=oData:Get(oTIPDOCCLI:cTipDoc+"NumFis",STRZERO(0,10))
      oTIPDOCCLI:TDC_PICTUR:=oData:Get(oTIPDOCCLI:cTipDoc+"Pictur",REPLI("9",10) )
      oTIPDOCCLI:TDC_PICFIS:=oData:Get(oTIPDOCCLI:cTipDoc+"PicFis",REPLI("9",10) )
+     
+*/
+
+     oData:End(.F.)
 
      // Si Calcula IVA, será monetario
      IF oTIPDOCCLI:TDC_IVA
        oTIPDOCCLI:TDC_MONETA:=.T.
      ENDIF
 
-
      IF lRunDoc
       oTIPDOCCLI:TDC_ACTIVO:=.T.
      ENDIF
 
-     oData:End(.F.)
+    
 
   ENDIF
 
@@ -190,7 +236,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
   //Tablas Relacionadas con los Controles del Formulario
 
-   oTIPDOCCLI:SetScroll(1,80,0,0)
+//   oTIPDOCCLI:SetScroll(1,80,0,0)
 
   oTIPDOCCLI:CreateWindow()       // Presenta la Ventana
 
@@ -209,10 +255,10 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   @ 11.8,15.0 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT "Relación Contable";
                       FONT oFontG
 
-  @ 11.8,15.0 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT "Sucursal ["+oDp:cSucursal+"]";
+  @ 11.8,15.0 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT "Sucursal ["+cCodSuc+"]";
                       FONT oFontG
 
-  @ 11.8,15.0 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT " Control Fiscal Sucursal ["+oDp:cSucursal+"]";
+  @ 11.8,15.0 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT " Control Fiscal Sucursal ["+cCodSuc+"]";
                       FONT oFontG
 
   @ 1,1 GROUP oTIPDOCCLI:oGroup TO 16.8,20 PROMPT " Tipo de Documento ";
@@ -232,7 +278,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_TIPO  :cMsg    :="Tipo de CxC"
     oTIPDOCCLI:oTDC_TIPO  :cToolTip:="Tipo de CxC"
 
-  @ 1,1 SAY "Tipo CxC" PIXEL;
+  @ 1,1 SAY "Tipo" PIXEL;
         SIZE NIL,7 
 
 
@@ -260,7 +306,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 6.4, 1.0 CHECKBOX oTIPDOCCLI:oTDC_RETIVA  VAR oTIPDOCCLI:TDC_RETIVA  PROMPT ANSITOOEM("Retenciones de IVA");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_RETIVA",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. .F. );
                      FONT oFont COLOR nClrText,NIL SIZE 148,10;
                     SIZE 4,10
 
@@ -274,7 +320,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 8.2, 1.0 CHECKBOX oTIPDOCCLI:oTDC_RETISR  VAR oTIPDOCCLI:TDC_RETISR  PROMPT ANSITOOEM("Retenciones de ISLR");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_RETISR",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. .F.);
                      FONT oFont COLOR nClrText,NIL SIZE 154,10;
                     SIZE 4,10
 
@@ -287,7 +333,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 10.0, 1.0 CHECKBOX oTIPDOCCLI:oTDC_IVA     VAR oTIPDOCCLI:TDC_IVA     PROMPT ANSITOOEM("Calcula I.V.A.");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_IVA",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. !ISDOCFISCAL(oTIPDOCCLI:TDC_TIPO));
                      FONT oFont COLOR nClrText,NIL SIZE 124,10;
                     SIZE 4,10
 
@@ -301,7 +347,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 1.0,15.0 CHECKBOX oTIPDOCCLI:oTDC_LIBVTA  VAR oTIPDOCCLI:TDC_LIBVTA  PROMPT ANSITOOEM("Libro de Venta");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_LIBVTA",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0 );
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. .F. );
                      FONT oFont COLOR nClrText,NIL SIZE 124,10;
                     SIZE 4,10
 
@@ -331,7 +377,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 4.6,15.0 CHECKBOX oTIPDOCCLI:oTDC_INVCON  VAR oTIPDOCCLI:TDC_INVCON  PROMPT ANSITOOEM("Contable");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_INVCON",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0 .AND. oTIPDOCCLI:TDC_PRODUC );
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. oTIPDOCCLI:TDC_PRODUC .AND. .F. );
                      FONT oFont COLOR nClrText,NIL SIZE 88,10;
                     SIZE 4,10;
                     ON CHANGE oTIPDOCCLI:GETVALEXI(oTIPDOCCLI:oTDC_EXIVAL)
@@ -374,8 +420,8 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   // Uso   : Existencia
   //
   @ 1,2 COMBOBOX oTIPDOCCLI:oEXI    VAR oTIPDOCCLI:cInvAct  ITEMS {"Suma","Resta","Ninguno"};
-                 WHEN (AccessField("DPTIPDOCCLI","TDC_INVACT",oTIPDOCCLI:nOption);
-                       .AND. oTIPDOCCLI:TDC_PRODUC;
+                 WHEN (.F. .AND. AccessField("DPTIPDOCCLI","TDC_INVACT",oTIPDOCCLI:nOption);
+                       .AND. oTIPDOCCLI:TDC_PRODUC ;
                        .AND. oTIPDOCCLI:nOption!=0 .AND.  (oTIPDOCCLI:TDC_INVFIS .OR. oTIPDOCCLI:TDC_INVLOG .OR. oTIPDOCCLI:TDC_INVCON));
                        FONT oFontG
 
@@ -410,9 +456,9 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   // Campo : TDC_PAGOS 
   // Uso   : Acepta Pagos                            
   //
-  @ 4.6, 1.0 CHECKBOX oTIPDOCCLI:oTDC_PAGOS   VAR oTIPDOCCLI:TDC_PAGOS   PROMPT ANSITOOEM("Acepta Pagos");
+  @ 4.6, 1.0 CHECKBOX oTIPDOCCLI:oTDC_PAGOS   VAR oTIPDOCCLI:TDC_PAGOS   PROMPT ANSITOOEM("Acepta Pago/Anticipo");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_PAGOS",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. .F. );
                      FONT oFont COLOR nClrText,NIL SIZE 112,10;
                     SIZE 4,10
 
@@ -426,7 +472,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 6.1, 1.0 COMBOBOX oTIPDOCCLI:oCXC    VAR oTIPDOCCLI:TDC_CXC    ITEMS aItems1;
                       WHEN (AccessField("DPTIPDOCCLI","TDC_CXC",oTIPDOCCLI:nOption);
-                     .AND. oTIPDOCCLI:nOption!=0);
+                     .AND. oTIPDOCCLI:nOption!=0 .AND. .F.);
                       FONT oFontG
 
 
@@ -444,7 +490,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 11.8,15.0 CHECKBOX oTIPDOCCLI:oTDC_CONTAB  VAR oTIPDOCCLI:TDC_CONTAB  PROMPT ANSITOOEM("Asientos Contables");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_CONTAB",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
+                    .AND. oTIPDOCCLI:nOption!=0) .AND. .F.;
                      FONT oFont COLOR nClrText,NIL SIZE 148,10;
                     SIZE 4,10
 
@@ -561,7 +607,6 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
               .AND. oTIPDOCCLI:nOption!=0);
         ON CHANGE oTIPDOCCLI:GETEDITFISCAL()
 
-
   ComboIni(oTIPDOCCLI:oTDC_SERIEF)
 
   oTIPDOCCLI:oTDC_SERIEF:cMsg    :="Serie Fiscal"
@@ -614,7 +659,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
 
  @ 1,10 SAY "Serie:"
- @ 1,10 SAY "# Fiscal:"
+ @ 1,10 SAY "# Fiscal" RIGHT
 
   // Campo : TDC_FORTXT
   // Uso   :Impresión en Formato Plano                      
@@ -680,7 +725,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
 //  @ 1,10 SAY "Serie:"
 
-
+/*
   //
   // Campo : TDC_COMISI 
   // Comisiones de Venta
@@ -694,8 +739,9 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_COMISI   :cMsg    :="Afecta Comisiones de Venta"
     oTIPDOCCLI:oTDC_COMISI   :cToolTip:="Afecta Comisiones de Venta"
+*/
 
-
+/*
   //
   // Campo : TDC_REGTAR
   // Uso   : Importación total desde el Documento de Origen
@@ -709,6 +755,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   oTIPDOCCLI:oTDC_REGTAR:cMsg    :="Registro de Taras de Carga"
   oTIPDOCCLI:oTDC_REGTAR:cToolTip:=oTIPDOCCLI:oTDC_REGTAR:cMsg
 
+*/
   @ 15,1 COMBOBOX oTIPDOCCLI:oTDC_DOCDES VAR oTIPDOCCLI:cNomDoc ITEMS aDocs;
                   WHEN (AccessField("DPTIPDOCCLI","TDC_DOCDES",oTIPDOCCLI:nOption );
                         .AND. oTIPDOCCLI:nOption!=0 .AND. oTIPDOCCLI:TDC_PRODUC .AND. DPVERSION()>4);
@@ -750,6 +797,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_AUTIMP:cMsg    :="AutoImpresión"
     oTIPDOCCLI:oTDC_AUTIMP:cToolTip:="AutoImpresión"
 
+/*
   //
   // Campo : TDC_DOCPRG
   // Uso   : Genera Documento Progresivo
@@ -762,6 +810,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_DOCPRG:cMsg    :="Genera "+oDp:DPCLIENTEPROG
     oTIPDOCCLI:oTDC_DOCPRG:cToolTip:="Genera "+oDp:DPCLIENTEPROG
+*/
 
   //
   // Campo : TDC_VALFCH
@@ -837,7 +886,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   // Uso   : Cantidad de Items     
   //
   @ 1.0, 20 GET oTIPDOCCLI:oTDC_NITEMS VAR oTIPDOCCLI:TDC_NITEMS ;
-                PICTURE "9999";
+                PICTURE "9999" RIGHT;
                 SPINNER;
                 WHEN (oTIPDOCCLI:TDC_LIBVTA .AND. oTIPDOCCLI:TDC_PRODUC .AND. ;
                       AccessField("DPTIPDOCCLI","TDC_NITEMS",oTIPDOCCLI:nOption) .AND. ;
@@ -847,7 +896,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_TIPO  :cMsg    :="Cantidas de Items"
     oTIPDOCCLI:oTDC_TIPO  :cToolTip:="Cantidas de Items"
 
- @ 1,10 SAY "Items Max.:"
+ @ 1,10 SAY "Items Max." RIGHT
 
 
   //
@@ -892,6 +941,21 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_ACTIVO:cToolTip:="Activo"
 
 
+ // Campo : TDC_LIBINV
+  // Uso   : Libro de Inventario                     
+  //
+  @ 6.4, 1.0 CHECKBOX oTIPDOCCLI:oTDC_LIBINV  VAR oTIPDOCCLI:TDC_LIBINV  PROMPT ANSITOOEM("Libro de Inventario");
+                    WHEN (AccessField("DPTIPDOCCLI","TDC_LIBINV",oTIPDOCCLI:nOption);
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. .F.);
+                     FONT oFont COLOR nClrText,NIL SIZE 148,10;
+                    SIZE 4,10
+
+    oTIPDOCCLI:oTDC_LIBINV:cMsg    :="Libro de Inventario"
+    oTIPDOCCLI:oTDC_LIBINV:cToolTip:="Libro de Inventario"
+
+
+
+/*
   //
   // Campo : TDC_DIFPAG
   // Uso   : Acepta Diferencia de Pago                   
@@ -904,7 +968,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_DIFPAG:cMsg    :="Acepta Diferencia de Pago"
     oTIPDOCCLI:oTDC_DIFPAG:cToolTip:="Acepta Diferencia de Pago"
-
+*/
 
   //
   // Campo : TDC_DELETE
@@ -912,13 +976,13 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   //
   @ 19, 20 CHECKBOX oTIPDOCCLI:oTDC_DELETE  VAR oTIPDOCCLI:TDC_DELETE  PROMPT ANSITOOEM("Eliminar Registro");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_DELETE",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0 .AND. ISRELEASE("17.01"));
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. !ISDOCFISCAL(oTIPDOCCLI:TDC_TIPO));
                      FONT oFont COLOR nClrText,NIL SIZE 148,10;
                     SIZE 4,10
 
     oTIPDOCCLI:oTDC_DELETE:cMsg    :="Eliminar Registro"
     oTIPDOCCLI:oTDC_DELETE:cToolTip:="Eliminar Registro"
-
+/*
   //
   // Campo : TDC_MOVED
   // Uso   : Puede Mover Número 
@@ -945,14 +1009,14 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_MOVEF:cMsg    :="Mover Número Fiscal"
     oTIPDOCCLI:oTDC_MOVEF:cToolTip:="Mover Número Fiscal"
 
-
+*/
   //
   // Campo : TDC_DEPURA
   // Uso   : Depuración de Registros
   //
   @ 22, 20 CHECKBOX oTIPDOCCLI:oTDC_DEPURA  VAR oTIPDOCCLI:TDC_DEPURA  PROMPT ANSITOOEM("Depurar Registros");
                     WHEN (AccessField("DPTIPDOCCLI","TDC_DEPURA",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0 .AND. ISRELEASE("17.01"));
+                    .AND. oTIPDOCCLI:nOption!=0 .AND. !ISDOCFISCAL(oTIPDOCCLI:TDC_TIPO));
                      FONT oFont COLOR nClrText,NIL SIZE 148,10;
                     SIZE 4,10
 
@@ -986,8 +1050,8 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_GUIATR:cMsg    :="Guia de Transporte"
     oTIPDOCCLI:oTDC_GUIATR:cToolTip:=oTIPDOCCLI:oTDC_GUIATR:cMsg
-
-
+/*
+esto lo define en la serie fiscal
   @ 15,15.0 CHECKBOX oTIPDOCCLI:oEditFiscal  VAR oTIPDOCCLI:lEditFiscal  PROMPT ANSITOOEM("Editar #Control Fiscal");
                      WHEN (oTIPDOCCLI:nOption!=0 .AND. oTIPDOCCLI:TDC_LIBVTA);
                      FONT oFont COLOR nClrText,NIL SIZE 124,10;
@@ -996,6 +1060,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oEditFiscal:cMsg    :="Editar Número de Control Fiscal"
     oTIPDOCCLI:oEditFiscal:cToolTip:=oTIPDOCCLI:oEditFiscal:cMsg
 
+*/
 
  // Campo : TDC_PRECIO
  // Uso   : Precio D 
@@ -1017,7 +1082,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
    @ 15,15.0 CHECKBOX oTIPDOCCLI:oTDC_MONETA  VAR oTIPDOCCLI:TDC_MONETA  PROMPT ANSITOOEM("Con Valor Monetario");
                      WHEN (AccessField("DPTIPDOCCLI","TDC_MONETA",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0 .AND. (oDp:nVersion>=6 .OR. ISRELEASE("19.09")));
+                    .AND. oTIPDOCCLI:nOption!=0);
                      FONT oFont COLOR nClrText,NIL SIZE 124,10;
                      SIZE 4,10
 
@@ -1025,7 +1090,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_MONETA:cToolTip:=oTIPDOCCLI:oTDC_MONETA:cMsg
 
 
-
+/*
    @ 15,15.0 CHECKBOX oTIPDOCCLI:oTDC_XY  VAR oTIPDOCCLI:TDC_XY  PROMPT ANSITOOEM("X*Y");
                      WHEN (AccessField("DPTIPDOCCLI","TDC_XY",oTIPDOCCLI:nOption);
                     .AND. oTIPDOCCLI:nOption!=0 .AND. oDp:nVersion>5.1);
@@ -1044,7 +1109,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_XYZ:cMsg    :="X*Y*Z Calcular Volumen"
     oTIPDOCCLI:oTDC_XYZ:cToolTip:=oTIPDOCCLI:oTDC_XYZ:cMsg
 
-
+*/
   @ 16,15.0 CHECKBOX oTIPDOCCLI:oTDC_REQAPR  VAR oTIPDOCCLI:TDC_REQAPR  PROMPT ANSITOOEM("Requiere Aprobación Exportar");
                      WHEN (AccessField("DPTIPDOCCLI","TDC_REQAPR",oTIPDOCCLI:nOption);
                     .AND. oTIPDOCCLI:nOption!=0 .AND. oDp:nVersion>=6.0);
@@ -1066,7 +1131,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
 //? "oTIPDOCCLI:oTDC_PRECIO:ClassName()"
 
-
+/*
   //
   // Campo : TDC_DIFCAM
   // Uso   : Acepta Diferencia de Pago                   
@@ -1079,6 +1144,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_DIFCAM:cMsg    :="Para Diferencial de Cambiario"
     oTIPDOCCLI:oTDC_DIFCAM:cToolTip:="Para Diferencial de Cambiario"
+*/
 
   //
   // Campo : TDC_ORGPLA
@@ -1094,13 +1160,13 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_ORGPLA:cToolTip:="Originado desde Plantilla"
 
 
-  @ 10,1 SAY "Formato:" RIGHT
-  @ 11,1 SAY "Formato:" RIGHT
+  @ 10,1 SAY "Formato" RIGHT
+  @ 11,1 SAY "Formato" RIGHT
 
   @ 11,1 SAY "Catálogo de Productos"
 
 
-
+/*
   //
   // Campo : TDC_CROSSD
   // Uso   : Proceso de Cross-Docking
@@ -1113,7 +1179,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_CROSSD:cMsg    :="Vinculo con Proceso Croos-Docking"
     oTIPDOCCLI:oTDC_CROSSD:cToolTip:="Vinculo con Proceso Croos-Docking"
-
+*/
   //
   // Campo : TDC_IMPTOT
   // Uso   : Importación total desde el Documento de Origen
@@ -1127,7 +1193,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
   oTIPDOCCLI:oTDC_IMPTOT:cMsg    :="Importación Total desde el Documento de Origen"
   oTIPDOCCLI:oTDC_IMPTOT:cToolTip:=oTIPDOCCLI:oTDC_IMPTOT:cMsg
 
-
+/*
   @ 10,15.0 CHECKBOX oTIPDOCCLI:oTDC_CNTRES  VAR oTIPDOCCLI:TDC_CNTRES  PROMPT ANSITOOEM("Resumido por día");
                      WHEN (AccessField("DPTIPDOCCLI","TDC_CNTRES",oTIPDOCCLI:nOption);
                     .AND. oTIPDOCCLI:nOption!=0 .AND. oTIPDOCCLI:TDC_CONTAB .AND. !oTIPDOCCLI:TDC_CONAUT);
@@ -1137,7 +1203,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
     oTIPDOCCLI:oTDC_CNTRES:cMsg    :="Generar Asientos Contables Resumidos"
     oTIPDOCCLI:oTDC_CNTRES:cToolTip:=oTIPDOCCLI:oTDC_CNTRES:cMsg
  
-
+*/
   //
   // Campo : TDC_INVLBX
   // Uso   : Formulario LBX
@@ -1151,7 +1217,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
    oTIPDOCCLI:oTDC_INVLBX:cMsg    :="Formulario del Catálogo de Productos"
    oTIPDOCCLI:oTDC_INVLBX:cToolTip:=oTIPDOCCLI:oTDC_EXIVAL:cMsg
 
-
+/*
    @ 20,15.0 CHECKBOX oTIPDOCCLI:oTDC_ESTVTA  VAR oTIPDOCCLI:TDC_ESTVTA  PROMPT ANSITOOEM("Estadística de Venta");
                      WHEN (AccessField("DPTIPDOCCLI","TDC_ESTVTA",oTIPDOCCLI:nOption);
                     .AND. oTIPDOCCLI:nOption!=0 .AND. oDp:nVersion>5.1);
@@ -1160,6 +1226,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
     oTIPDOCCLI:oTDC_ESTVTA:cMsg    :="Estadística de Venta"
     oTIPDOCCLI:oTDC_ESTVTA:cToolTip:=oTIPDOCCLI:oTDC_ESTVTA:cMsg
+*/
 
 
   @ 20,15.0 CHECKBOX oTIPDOCCLI:oTDC_IMPPAG  VAR oTIPDOCCLI:TDC_IMPPAG  PROMPT ANSITOOEM("Imprime solo Pagado");
@@ -1224,18 +1291,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc)
 
 
   //
-  // Campo : TDC_LIBINV
-  // Uso   : Libro de Inventario                     
-  //
-  @ 6.4, 1.0 CHECKBOX oTIPDOCCLI:oTDC_LIBINV  VAR oTIPDOCCLI:TDC_LIBINV  PROMPT ANSITOOEM("Libro de Inventario");
-                    WHEN (AccessField("DPTIPDOCCLI","TDC_LIBINV",oTIPDOCCLI:nOption);
-                    .AND. oTIPDOCCLI:nOption!=0);
-                     FONT oFont COLOR nClrText,NIL SIZE 148,10;
-                    SIZE 4,10
-
-    oTIPDOCCLI:oTDC_LIBINV:cMsg    :="Libro de Inventario"
-    oTIPDOCCLI:oTDC_LIBINV:cToolTip:="Libro de Inventario"
-
+ 
   oTIPDOCCLI:Activate({||oTIPDOCCLI:BARINICIO()})
  
 //  
@@ -1320,7 +1376,56 @@ FUNCTION BARINICIO()
    oTIPDOCCLI:oColor:SetColor(oTIPDOCCLI:oColor:nClrText,oTIPDOCCLI:TDC_CLRGRA)
 
    oTIPDOCCLI:GETVALEXI(oTIPDOCCLI:oTDC_EXIVAL)
- 
+
+   DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 BOLD
+
+   @ 2,200 SAY " "+oDp:xDPSUCURSAL+" " OF oBar ;
+           BORDER  PIXEL RIGHT;
+           COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 59+4,20
+
+   @ 2,264 SAY " "+oTIPDOCCLI:cCodSuc OF oBar SIZE 60,20 BORDER PIXEL; 
+           COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 100,20
+
+   @23,200 SAY " Nombre " OF oBar ;
+           BORDER  PIXEL RIGHT;
+           COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 59+4,20
+
+   @23,264 SAY " "+SQLGET("DPSUCURSAL","SUC_DESCRI","SUC_CODIGO"+GetWhere("=",oTIPDOCCLI:cCodSuc)) OF oBar;
+           SIZE 300,20 BORDER PIXEL;
+           COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont 
+
+
+/*
+   @ 1,200 SAY oTIPDOCCLI:cCodSuc OF oBar SIZE 100,20 BORDER PIXEL FONT oFont
+
+   @25,200 SAY SQLGET("DPSUCURSAL","SUC_DESCRI","SUC_CODIGO"+GetWhere("=",oTIPDOCCLI:cCodSuc)) OF oBar;
+           SIZE 300,20 BORDER PIXEL FONT oFont
+*/
+
+/*
+  DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -12 BOLD
+
+  @ 68,015 SAY " Serie " OF oBar ;
+           BORDER  PIXEL RIGHT;
+           COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 59,20
+
+  @ 68,310 SAY " Medio " OF oBar ;
+           BORDER  PIXEL RIGHT;
+           COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 59,20
+
+  @ 68,015+60 SAY " "+oSELSERFISXTIP:cLetra+"-"+ALLTRIM(oSELSERFISXTIP:cSerieF)+" " OF oBar ;
+           BORDER  PIXEL;
+           COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 200,20
+
+  @ 68,310+60 SAY " "+ALLTRIM(oSELSERFISXTIP:cImpFis)+" " OF oBar ;
+           BORDER  PIXEL;
+           COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 200,20
+*/
+
+
+
+
+
 RETURN .T.
 
 /*
@@ -1363,10 +1468,12 @@ FUNCTION PRESAVE()
   ENDIF
 
   IF !oTIPDOCCLI:TDC_LIBVTA
-    oTIPDOCCLI:TDC_SERIEF:="Ninguno" // ATAIL( oTIPDOCCLI:aSeries)
+
+    oTIPDOCCLI:TDC_SERIEF:="NO-FISCAL" // ATAIL( oTIPDOCCLI:aSeries)
+
   ELSE
 
-    IF "NINGUNO"$UPPER(oTIPDOCCLI:TDC_SERIEF)
+    IF "NO-FISCAL"$UPPER(oTIPDOCCLI:TDC_SERIEF)
 
        oTIPDOCCLI:oTDC_SERIEF:MsgErr("Tipo de Documento "+oTIPDOCCLI:TDC_TIPO+CRLF+;
                                      "está vinculado con el Libro de ventas."+CRLF+"Requiere su respectiva SERIE FISCAL")
@@ -1405,9 +1512,11 @@ RETURN lResp
 */
 FUNCTION POSTSAVE()
   LOCAL oData,cCodigo:=ALLTRIM(oTIPDOCCLI:TDC_TIPO)
-  LOCAL cWhere
+  LOCAL cWhere,nLen  :=LEN(oTIPDOCCLI:cNumero)
+  LOCAL cLetra:=SQLGET("DPSERIEFISCAL","SFI_LETRA","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
 
-  oData:=DATASET("SUC_V"+oDp:cSucursal,"ALL")
+/*
+  oData:=DATASET("SUC_V"+oTIPDOCCLI:cCodSuc,"ALL",NIL,NIL,NIL,NIL,.T.)
   oData:Set(cCodigo+"Numero",oTIPDOCCLI:cNumero)
   oData:Set(cCodigo+"Serie" ,oTIPDOCCLI:TDC_SERIEF)
   oData:Set(cCodigo+"NumFis",oTIPDOCCLI:cNumFis)
@@ -1416,6 +1525,19 @@ FUNCTION POSTSAVE()
 
   oData:Save(.T.)
   oData:End()
+*/
+
+  SQLUPDATE("DPSERIEFISCAL",{"SFI_EDITAB"          ,"SFI_PICTUR"         ,"SFI_NUMERO"      ,"SFI_ITEMXP"           },;
+                            {oTIPDOCCLI:lEditFiscal,oTIPDOCCLI:TDC_PICFIS,oTIPDOCCLI:cNumFis,oTIPDOCCLI:TDC_NITEMS},;
+                            "SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
+
+  cWhere :="TDN_CODSUC"+GetWhere("=",oTIPDOCCLI:cCodSuc )+" AND "+;
+           "TDN_TIPDOC"+GetWhere("=",oTIPDOCCLI:TDC_TIPO)+" AND "+;
+           "TDN_SERFIS"+GetWhere("=",cLetra)
+
+  EJECUTAR("CREATERECORD","dptipdocclinum",{"TDN_CODSUC"      ,"TDN_TIPDOC"       ,"TDN_SERFIS"          ,"TDN_LEN","TDN_PICTUR"         ,"TDN_EDITAR"         ,"TDN_ACTIVO"},;
+                                           {oTIPDOCCLI:cCodSuc,oTIPDOCCLI:TDC_TIPO, cLetra               ,nLen     ,oTIPDOCCLI:TDC_PICTUR,oTIPDOCCLI:TDC_NUMEDT,.T.         },;
+                                            NIL,.T.,cWhere)
 
 // Registrar la Cuenta Contable
   EJECUTAR("SETCTAINTMOD","DPTIPDOCCLI_CTA",oTIPDOCCLI:TDC_TIPO,"","CODCTA",oTIPDOCCLI:TDC_CODCTA,.T.)
@@ -1481,6 +1603,9 @@ FUNCTION POSTSAVE()
   oDp:nImpFisEntCan:=0
   oDp:cModSerFis   :=""
 
+  IF !Empty(oTIPDOCCLI:cLetra)
+     EJECUTAR("BRSELSERFISXTIP",NIL,NIL,NIL,NIL,NIL,NIL,oTIPDOCCLI:cLetra)
+  ENDIF
 
 RETURN .T.
 
@@ -1558,12 +1683,11 @@ FUNCTION RUNINVLBX()
 RETURN .T.
 
 FUNCTION GETEDITFISCAL()
+
 //  LOCAL lEdit
 //  lEdit:=SQLGET("DPSERIEFISCAL","SFI_EDITAB","SFI_MODELO"+GetWhere("=",cSerie))
-
-  oTIPDOCCLI:lEditFiscal:=SQLGET("DPSERIEFISCAL","SFI_EDITAB","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
-
-  oTIPDOCCLI:oEditFiscal:Refresh(.T.)
+//  oTIPDOCCLI:lEditFiscal:=SQLGET("DPSERIEFISCAL","SFI_EDITAB","SFI_MODELO"+GetWhere("=",oTIPDOCCLI:TDC_SERIEF))
+//oTIPDOCCLI:oEditFiscal:Refresh(.T.) // 11/03/2025 NO SE PUEDE MODIFICAR EL NUMERO FISCAL 
 // ? oTIPDOCCLI:lEditFiscal,oDp:cSql
 
 RETURN .T.

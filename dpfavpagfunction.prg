@@ -109,31 +109,56 @@ RETURN nExp
 // Colocar Banco
 */
 FUNCTION PUTBANCO(oCol,uValue,nCol)
-RETURN .T.
+   LOCAL oColEdit:=oBrw:aCols[17-1]
+   LOCAL aCuentas:=ACLONE(oDp:aCuentaBco)
+  
+   ADEPURA(aCuentas,{|a,n|!ALLTRIM(a[1])=ALLTRIM(uValue)})
 
-FUNCTION BRWCHANGEPAGOS()
-   LOCAL aLine:=oBrw:aArrayData[oBrw:nArrayAt]
-   LOCAL oCol :=oBrw:aCols[15]
-   LOCAL oDoc :=oBrw:oLbx
+   AEVAL(aCuentas,{|a,n| aCuentas[n]:=a[2]})
 
-//   oDp:oFrameDp:SetText(LSTR(LEN(aLine))+" VALTYPE ALINE[8]"+ValType(aLine[8]))
+   oBrw:aArrayData[oBrw:nArrayAt,16-1]:=uValue
 
-   IF aLine[08]="BCO" .AND. oDoc:nMtoDoc>0 .AND. aLine[oDoc:nColSelP] .AND. LEN(oDp:aCuentaBco)>0
+   IF LEN(aCuentas)>1
 
-      oCol:nEditType     :=EDIT_LISTBOX
-      oCol:aEditListTxt  :=ACLONE(oDp:aNombreBco)
-      oCol:aEditListBound:=ACLONE(oDp:aNombreBco)
-      oCol:bOnPostEdit   :={|oCol,uValue|oBrw:PUTBANCO(oCol,uValue,15)} // Debe seleccionar las cuentas bancarias
-      oBrw:DrawLine(.T.)
-      
+     oColEdit:nEditType     :=EDIT_LISTBOX
+     oColEdit:aEditListTxt  :=ACLONE(aCuentas)
+     oColEdit:aEditListBound:=ACLONE(aCuentas)
+     oColEdit:bOnPostEdit   :={|oCol,uValue|oBrw:SETMARCAF(uValue ),oBrw:PUTCUENTA(oCol,uValue,17-1)} // Debe seleccionar las cuentas bancarias
+     oBrw:nColSel   :=17-1
+
    ELSE
 
-      oCol:nEditType    :=0
-      oCol:bOnPostEdit  :=NIL
+     oColEdit:nEditType     :=0
+     oBrw:aArrayData[oBrw:nArrayAt,17-1]:=IF(Empty(aCuentas),SPACE(24),aCuentas[1])
+     oBrw:nColSel   :=18-1
 
+     oBrw:SETMARCAF(IF(Empty(aCuentas),SPACE(24),aCuentas[1])) // Seleccionar Marca
+ 
    ENDIF
 
+   // EDITAR REFERENCIA
+   oColEdit:=oBrw:aCols[18-1]
+   oColEdit:nEditType     :=1
+   oColEdit:bOnPostEdit   :={|oCol,uValue|oBrw:PUTREFERENCIA(oCol,uValue,17)} 
+
+   oBrw:DrawLine(.T.)
+
+
 RETURN .T.
+
+FUNCTION SETMARCAF()
+? "SETMARCAF"
+
+RETURN NIL
+
+FUNCTION PUTCUENTA()
+  ? "PUTCUENTA"
+RETURN .T.
+
+FUNCTION PUTREFERENCIA()
+? "PUTREFERENCIA("
+RETURN .T.
+
 
 FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh,lTodo)
   LOCAL oBrw    :=oCol:oBrw
@@ -370,6 +395,83 @@ FUNCTION CALSUG(nMtoSug,nMoneda,cCodMon)
     ENDIF
 
 RETURN nMonto
+
+FUNCTION SETCAJA(oBrw)
+  LOCAL nAt    :=oBrw:nArrayAt
+  LOCAL nRowSel:=oBrw:nRowSel
+  LOCAL aData  :={}
+  LOCAL oDoc   :=oBrw:oLbx
+
+  IF !Empty(oDoc:aBancoAct)
+     AEVAL(oDoc:aBancoAct,{|a,n| AADD(oBrw:aArrayData,a)})
+     aData  :=ACLONE(oBrw:aArrayData)
+     oDoc:aBancoAct:={}
+  ENDIF
+
+  // Apagar, Copia todos Componentes de Caja
+  IF Empty(oDoc:aCajaAct)
+
+     aData        :=ACLONE(oBrw:aArrayData)
+     oDoc:aCajaAct:=ACLONE(aData)
+
+     ADEPURA(oDoc:aCajaAct,{|a,n| a[oDoc:nColCajBco]<>"BCO" .AND. a[5]<>0})
+     ADEPURA(aData        ,{|a,n| a[oDoc:nColCajBco]="BCO"  .AND. a[5]= 0})
+
+     nAt:=MIN(nAt,LEN(aData))
+
+  ELSE
+
+     aData         :=ACLONE(oDoc:aBancoAct)
+     oDoc:aBancoAct:={}
+
+  ENDIF
+
+  oBrw:aArrayData:=ACLONE(aData)
+  oBrw:nArrayAt:=1
+  oBrw:nRowSel :=1
+  oBrw:Refresh(.F.)
+
+RETURN .T.
+
+FUNCTION SETBANCO(oBrw)
+  LOCAL nAt    :=oBrw:nArrayAt
+  LOCAL nRowSel:=oBrw:nRowSel
+  LOCAL aData  :={} 
+  LOCAL oDoc   :=oBrw:oLbx
+ 
+  IF !Empty(oDoc:aCajaAct)
+     AEVAL(oDoc:aCajaAct,{|a,n| AADD(oBrw:aArrayData,a)})
+     aData  :=ACLONE(oBrw:aArrayData)
+     oDoc:aCajaAct:={}
+  ENDIF
+
+ // Apagar, Copia todos Componentes de Caja
+
+  IF Empty(oDoc:aBancoAct)
+
+     aData         :=ACLONE(oBrw:aArrayData)
+     oDoc:aBancoAct:=ACLONE(aData)
+  
+     ADEPURA(oDoc:aBancoAct,{|a,n| a[oDoc:nColCajBco]<>"CAJ" .AND. a[5]<>0})
+     ADEPURA(aData,{|a,n| a[oDoc:nColCajBco]="CAJ" .AND. a[5]=0})
+
+     nAt:=MIN(nAt,LEN(aData))
+
+  ELSE
+
+     aData:=ACLONE(oDoc:aBancoAct)
+     // AEVAL(oDoc:aBancoAct,{|a,n| AADD(aData,a)})
+     oDoc:aBancoAct:={}
+
+  ENDIF
+
+  oBrw:aArrayData:=ACLONE(aData)
+  oBrw:nArrayAt:=1
+  oBrw:nRowSel :=1
+  oBrw:Refresh(.F.)
+
+
+RETURN .T.
 // EOF
 
 

@@ -16,6 +16,12 @@ PROCE MAIN(oDoc)
       RETURN NIL
    ENDIF
 
+   oDoc:lCajaAct:=.F.
+   oDoc:lBancoAct:=.F.
+
+   oDoc:aCajaAct:={}
+   oDoc:aBancoAct:={}
+ 
    oDoc:lDifCambiario:=.F. 
    oDoc:cCodCaja     :=oDp:cCodCaja
    oDoc:nTotal       :=0
@@ -127,13 +133,13 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[1]
    oCol:cHeader      :="Moneda"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth       := 120
+   oCol:nWidth       := 100
    oCol:cFooter      :="#"+LSTR(LEN(aData)) // FDP(aTotal[4],"999,999,999.99")
 
    oCol:=oBrw:aCols[2]
    oCol:cHeader      :="Tasa "+CRLF+"en "+oDp:cMoneda
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrwPag:aArrayData ) } 
-   oCol:nWidth       := 80
+   oCol:nWidth       := 60
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -143,7 +149,7 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[3]
    oCol:cHeader      :="Monto"+CRLF+"Sugerido"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrwPag:aArrayData ) } 
-   oCol:nWidth       := 110
+   oCol:nWidth       := 100
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -153,7 +159,7 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[4]
    oCol:cHeader      :="Recibido"+CRLF+"Divisa"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrwPag:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 90
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -168,7 +174,7 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[5]
    oCol:cHeader      :="Monto"+CRLF+"Recibido ("+oDp:cMoneda+")"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 90
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -189,7 +195,7 @@ PROCE MAIN(oDoc)
    oCol:bStrData    :={||""}
    oCol:bBmpData    := { |oCol,oBrw|oBrw:=oCol:oBrw,;
                                     IIF(oBrw:aArrayData[oBrw:nArrayAt,oBrw:oLbx:nColIsMon],1,2) }
-   oCol:nWidth      := 40
+   oCol:nWidth      := 35
 
 
    oCol:=oBrw:aCols[oDoc:nColCodMon]
@@ -200,7 +206,7 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[oDoc:nColCajBco]
    oCol:cHeader      :="Caja"+CRLF+"Bco"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrwPag:aArrayData ) } 
-   oCol:nWidth       := 30
+   oCol:nWidth       := 34
    oCol:bClrStd      := {|oCol,oBrw,nClrText,aLine|oBrw    :=oCol:oBrw,;
                                                    aLine   :=oBrw:aArrayData[oBrw:nArrayAt],;
 	                                              nClrText:=IF("CAJ"$aLine[oBrw:oLbx:nColCajBco],oBrw:oLbx:nClrText5,oBrw:oLbx:nClrText3),;
@@ -233,7 +239,7 @@ PROCE MAIN(oDoc)
    oCol:=oBrw:aCols[ oDoc:nColMtoITG]
    oCol:cHeader      :="Monto"+CRLF+"IGTF "+oDp:cMoneda
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrw:aArrayData ) } 
-   oCol:nWidth       := 80
+   oCol:nWidth       := 70
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -253,28 +259,28 @@ PROCE MAIN(oDoc)
 
    oCol:nDataStyle  := oCol:DefStyle( AL_LEFT, .F.)
    oCol:bStrData    :={||""}
-
-
+   oCol:nWidth      := 40-8
+ 
 
    oCol:=oBrw:aCols[oDoc:nColMarcaFin]
    oCol:cHeader      :="Marca"+CRLF+"Financiera"
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 110
 
    oCol:=oBrw:aCols[oDoc:nColMarcaFin+1]
    oCol:cHeader      :="Banco"
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 110
 
    oCol:=oBrw:aCols[oDoc:nColMarcaFin+2]
    oCol:cHeader      :="Cuenta"+CRLF+"Bancaria"
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 110
 
    oCol:=oBrw:aCols[oDoc:nColMarcaFin+3]
    oCol:cHeader       :="Referencia"
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, o:oBrw:aArrayData ) } 
-   oCol:nWidth        := 100
+   oCol:nWidth        := 100-5
 
    oCol:=oBrw:aCols[oDoc:nColDuplicar]
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBrwPag:aArrayData ) } 
@@ -286,6 +292,8 @@ PROCE MAIN(oDoc)
 
    oCol:nDataStyle  := oCol:DefStyle( AL_LEFT, .F.)
    oCol:bStrData    :={||""}
+   oCol:nWidth      := 40
+
   
    oBrw:bLDblClick:={|nRow,nCol,nKeyFlags,oBrw| oBrw:RUNCLICK() }
 
@@ -293,9 +301,9 @@ PROCE MAIN(oDoc)
    oBrw:bClrFooter            := {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
 
 
-   oBrw:bChange:={|oBrw| oBrw:BRWCHANGEPAGOS(),;
-                         PUBLICO("oBrwPag",oBrw),;
-                         PUBLICO("oBrwDoc",oBrw:oLbx) } 
+   oBrw:bChange:={|oBrw| PUBLICO("oBrwPag",oBrw),;
+                         PUBLICO("oBrwDoc",oBrw:oLbx),;
+                         EJECUTAR("DPFACTURAV_SETBANCOS",oBrw) } 
 
 
    oBrw:bClrStd:= {|oCol,oBrw,nClrText,aLine,oDoc| oBrw    :=oCol:oBrw,oDoc:=oBrw:oLbx,;
