@@ -8,7 +8,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
+PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar)
    LOCAL cWhere:="",I,aData:={},lResp:=.F.,aTotal:={},lPreview:=.F.
    LOCAL lSave :=.T.,nDesc:=0,nRecarg:=0,nDocOtros:=0,cOrigen:="V",nIvaReb:=0,cDocOrg:="V",nAct:=0,cPicture:="999,999,999.99"
    LOCAL oBrush,oDlg,oCol,oBrw,cTitle:="Confirmar Factura" 
@@ -17,12 +17,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
    LOCAL nHeight:=180+20 // Alto
    LOCAL oFontB :=NIL
    LOCAL oBar,oRep,bBlq,cKey,cCodRep
+   LOCAL cNumFis:=SPACE(10),cNum8,oGet8
   
-
    DEFAULT cCodSuc:=oDp:cSucursal,;
            cTipDoc:="FAV",;
-           cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)),;
-           cNomDoc:=SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"  +GetWhere("=",cTipDoc))
+           cNumero:=SQLGETMAX("DPDOCCLI"  ,"DOC_NUMERO","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)),;
+           cLetra :=SQLGET("DPDOCCLI"     ,"DOC_SERFIS","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND DOC_NUMERO"+GetWhere("=",cNumero)),;
+           cImpFis:=SQLGET("DPSERIEFISCAL","SFI_IMPFIS","SFI_LETRA" +GetWhere("=",cLetra )),;
+           cSerie :=SQLGET("DPSERIEFISCAL","SFI_MODELO","SFI_LETRA" +GetWhere("=",cLetra )),;
+           lEditar:=SQLGET("DPSERIEFISCAL","SFI_EDITAB","SFI_LETRA" +GetWhere("=",cLetra )),;
+           cNomDoc:=SQLGET("DPTIPDOCCLI"  ,"TDC_DESCRI","TDC_TIPO"  +GetWhere("=",cTipDoc))
 
    cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
            "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
@@ -48,14 +52,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
 
   AEVAL(aData,{|a,n| aData[n,8]:=a[4]+a[7]})
 
-  aTotal:=ATOTALES(aData)
+  aTotal :=ATOTALES(aData)
 
-
+  cNumFis:=EJECUTAR("DPDOCCLIGETNUMFIS",cCodSuc,cLetra,cTipDoc,cNumero)
+  // cNum8  :=RIGHT(cNumFis,8)
   cDescri:="Confirmar : "+ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
 
   DEFINE FONT oFontB NAME "Tahoma"   SIZE 0, -12  BOLD
 
   DEFINE DIALOG oDlg TITLE cDescri FROM 1,30 TO nHeight,nWidth PIXEL 
+
 // STYLE nOr(WS_POPUP,WS_VISIBLE) BRUSH oBrush
 
   oDlg:lHelpIcon:=.F.
@@ -66,7 +72,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
   oBrw:SetArray( aData , .F. )
   oBrw:oFont:=oFontB
   oBrw:lFooter     := .T.
-
 
   // Renglon Tipo
   oCol:=oBrw:aCols[1]
@@ -86,7 +91,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
   oCol:nDataStrAlign:= AL_RIGHT
   oCol:bStrData     := {||TRAN(oBrw:aArrayData[oBrw:nArrayAt,3],"999.99")}
   oCol:nFootStrAlign:= AL_RIGHT
-
  
   // Renglon Base Bruta
   oCol:=oBrw:aCols[4]
@@ -147,10 +151,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
 
   oBrw:nRecSelColor := oDp:nLbxClrHeaderPane // 9302500
 
-  oBrw:bClrHeader            := {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
-  oBrw:bClrFooter            := {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
-
-  oBrw:bClrStd      := {||{0,IIF(oBrw:nArrayAt%2=0,oDp:nClrPane1,oDp:nClrPane2	)}}
+  oBrw:bClrHeader:= {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
+  oBrw:bClrFooter:= {|| { oDp:nLbxClrHeaderText, oDp:nLbxClrHeaderPane}}
+  oBrw:bClrStd   := {|| {0,IIF(oBrw:nArrayAt%2=0,oDp:nClrPane1,oDp:nClrPane2	)}}
 
   oBrw:CreateFromCode()
 
@@ -159,12 +162,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cNomDoc)
 
   IF lPreview
      
-      IF "CNTGRT"$GETLLAVE_DATA("LIC_CODIGO") .AND. !oDp:cCodEmp="0000"
-         oDp:lCrystalDesign:=.F. // apaga crystal desing
-         MsgMemo("Licencia Contable no está Autorizada para Emitir factura")
-         RETURN .F.
-      ENDIF
-
       cCodRep:="DOCCLI"+cTipDoc
       cDescri:=ALLTRIM(SQLGET("DPREPORTES","REP_DESCRI","REP_CODIGO"+GetWhere("=",cCodRep)))
 
@@ -195,12 +192,13 @@ RETURN lResp
 // Coloca la Barra de Botones
 */
 FUNCTION DLGBAR()
-   LOCAL oCursor,oBtn,oFont
+   LOCAL oCursor,oBtn,oFontB,oFont,nCol:=20
 
    DEFINE FONT oFont NAME "Tahoma"   SIZE 0, -12  BOLD
+   DEFINE FONT oFont NAME "Tahoma"   SIZE 0, -14  BOLD
 
    DEFINE CURSOR oCursor HAND
-   DEFINE BUTTONBAR oBar SIZE 55,80-10 OF oDlg 3D CURSOR oCursor
+   DEFINE BUTTONBAR oBar SIZE 65+1,65+5 OF oDlg 3D CURSOR oCursor
 
    DEFINE BUTTON oBtn;
           OF oBar;
@@ -210,7 +208,6 @@ FUNCTION DLGBAR()
           FILENAME "BITMAPS\XSAVE.BMP";
           ACTION (lResp:=.T.,oDlg:End())
 
-
    DEFINE BUTTON oBtn;
           OF oBar;
           NOBORDER;
@@ -219,18 +216,49 @@ FUNCTION DLGBAR()
           FILENAME "BITMAPS\PREVIEW.BMP";
           ACTION (lPreview:=.T.,lResp:=.F.,oDlg:End())
 
-
    DEFINE BUTTON oBtn;
           OF oBar;
           NOBORDER;
           FONT oFont;
-          TOP PROMPT "Cancelar"; 
+          TOP PROMPT "Regresar"; 
           FILENAME "BITMAPS\XCANCEL.BMP";
           ACTION (lResp:=.F.,oDlg:End())
 
-  AEVAL(oBar:aControls,{|o,n|o:SetColor(0,oDp:nGris)})
+  AEVAL(oBar:aControls,{|o,n|nCol:=nCol+o:nWidth(), o:SetColor(0,oDp:nGris)})
   oBar:SetColor(0,oDp:nGris)
 
+  @ 02,nCol SAY " Serie " OF oBar ;
+            BORDER  PIXEL RIGHT;
+            COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 62,20
 
+  @ 23,nCol SAY " Medio " OF oBar ;
+            BORDER  PIXEL RIGHT;
+            COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 62,20
+ 
+  @ 44,nCol SAY " Número " OF oBar ;
+            BORDER  PIXEL RIGHT;
+            COLOR oDp:nClrLabelText,oDp:nClrLabelPane FONT oFont SIZE 62,20
+
+  @ 02,nCol+63 SAY " "+cSerie OF oBar;
+               BORDER  PIXEL;
+               COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 200,20
+
+  @ 23,nCol+63 SAY " "+cLetra+"-"+cImpFis;
+               BORDER  PIXEL;
+               COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 200,20
+
+  @ 44,nCol+63 SAY oNumFis VAR " "+cNumFis+" " OF oBar ;
+               PIXEL ;
+               BORDER;
+               COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 110,20
+
+
+RETURN .T.
+
+/*
+// no puede estar asociado con otro documento
+// tampoco puede dejar espacios vacios
+*/
+FUNCTION VALNUMFISCAL()
 RETURN .T.
 // EOF

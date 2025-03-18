@@ -21,11 +21,14 @@ FUNCTION MAIN(oRecDiv,cRif,nValCam,oBrw,nColIsMon,lCliente,cNumRec,cCodSuc,cTipD
      dFecha:=oRecDiv:dFecha
   ENDIF
 
-  DEFAULT cCodSuc:=oDp:cSucursal
+  DEFAULT cCodSuc :=oDp:cSucursal,;
+          lCliente:=.T.
 
   nColIsMon:=13
 
   EJECUTAR("DPRECIBOSDIVINST",lCliente)
+
+  SQLUPDATE("DPTABMON",{"MON_RECING","MON_ACTIVO"},{.T.,.T.},GetWhereOr("MON_CODIGO",{"BSD"}))
 
   DEFAULT cTipDoc:=IF(lCliente,"REC","PAG"),;
           nOption:=1
@@ -67,8 +70,6 @@ FUNCTION MAIN(oRecDiv,cRif,nValCam,oBrw,nColIsMon,lCliente,cNumRec,cCodSuc,cTipD
         [ ORDER BY HMN_VALOR DESC ]
 
   aData:=ASQL(cSql)
-
-// ? cNumRec,CLPCOPY(oDp:cSql)
 
   AEVAL(aData,{|a,n| aData[n,2]:=IF(a[2]=0 .OR. a[2]=1,EJECUTAR("DPGETVALCAM",a[7],dFecha),a[2])})
 
@@ -160,6 +161,28 @@ FUNCTION MAIN(oRecDiv,cRif,nValCam,oBrw,nColIsMon,lCliente,cNumRec,cCodSuc,cTipD
      // Posiciona primero los que tienen pago
      aData:=ASORT(aData,,, { |x, y| x[5] > y[5] })
   ENDIF
+
+IF lCliente
+
+  IF !oDp:lConEsp
+    AEVAL(aData,{|a,n| aData[n,11]:=0  })
+  ELSE
+    AEVAL(aData,{|a,n| aData[n,11]:=IF(a[11]>0 .AND. a[7]<>oDp:cMoneda,3,0)})
+  ENDIF
+
+ENDIF
+
+  nAt:=ASCAN(aData,{|a,n| a[7]="COP"})
+
+  IF nAt>0
+     // EJECUTAR("CALCOP")
+     SET DECI TO 6
+     aData[nAt,2]:=ROUND(oDp:nDivisa/oDp:nValCop,8)
+     aData[nAt,1]:="COP "+LSTR(ROUND(oDp:nDivisa/oDp:nValCop,8),19,8)
+     SET DECI TO 2
+  ENDIF
+
+  // AEVAL(aData,{|a,n| aData[n,2]:=ROUND(aData[n,2],2) }) // Redondeo de 2
 
 //  ViewArray(aData)
 

@@ -48,7 +48,7 @@ PROCE MAIN(oDoc,lReset)
        oDoc:nMtoDoc:=oDoc:DOC_NETO 
        oDoc:oBrwPag:SETSUGERIDO()
 
-       oDoc:oBrwPag:Move(40,0,oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)
+       oDoc:oBrwPag:Move(40+4,0,oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)
        oDoc:oBrwPag:SetColor(0,oDp:nClrPane1)
 
 //     oDoc:oBrwPag:SetSize(oDoc:oDlg:nWidth()-15,oDoc:oFolder:nHeight()-25-nAltoBtn,.T.)

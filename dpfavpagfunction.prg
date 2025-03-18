@@ -8,15 +8,90 @@
 
 #INCLUDE "DPXBASE.CH"
 
-FUNCTION RUNCLICK()
+FUNCTION RUNCLICK(lClonar)
     LOCAL aLine:=oBrw:aArrayData[oBrw:nArrayAt]
     LOCAL oCol :=oBrw:aCols[4]
+    LOCAL nAt  :=oBrw:nArrayAt,nRowSel:=oBrw:nRowSel
+
+    DEFAULT lClonar:=.F.
 
     IF oBrw:nGetColSel()=3
-       oBrw:PUTMONTO(oCol,aLine[3],4) // ,nAt,lRefresh)
+       oBrw:PUTMONTO(oCol,aLine[3],nil,nil,nil,.T.) 
     ENDIF
 
+    IF oBrw:nGetColSel()=oDoc:nColPorITG .AND. aLine[4]<>0 
+      oBrw:ADDIGTF(oBrw:nArrayAt) // Agrega el IGTF como pago con la misma moneda
+      oBrw:SETSUGERIDO()
+      RETURN .F.
+    ENDIF
+
+    IF lClonar .OR. (oBrw:nGetColSel()=18)
+
+      aLine[18]:=.T.
+      aLine[04]:=0
+      aLine[05]:=0
+
+      AINSERTAR(oBrw:aArrayData,nRowSel,ACLONE(aLine))
+
+      oBrw:nArrayAt:=nAt
+      oBrw:aArrayData:Refresh(.F.)
+      oBrw:SETSUGERIDO()
+    
+     RETURN .F.
+
+   ENDIF
+
+
 RETURN .T.
+
+/*
+// Agrega el IGTF como pago con la misma moneda
+*/
+FUNCTION ADDIGTF(nAt,lRefresh)
+   LOCAL aLine,nMtoIGTF,cCodMon,nPos
+
+   DEFAULT nAt     :=oBrw:nArrayAt,;
+           lRefresh:=.T.
+
+   aLine   :=ACLONE(oBrw:aArrayData[nAt])
+
+   nMtoIGTF:=aLine[oDoc:nColMtoITG] // monto del IGTF
+   cCodMon :=aLine[1]
+   nPos    :=ASCAN(oBrw:aArrayData,{|a,n| a[1]=cCodMon .AND. a[5]=nMtoIGTF})
+
+   // Desmarcar pago con IGTF
+   IF !aLine[oDoc:nColSelP] .AND. nPos=0
+	 RETURN .F.
+   ENDIF
+
+   IF nPos>0
+
+      // Eliminar el IGTF
+      ARREDUCE(oBrw:aArrayData,nPos)
+
+   ELSE
+
+      aLine[05]:=aLine[oDoc:nColMtoITG]
+      aLine[04]:=oBrw:CALSUG(aLine[oDoc:nColMtoITG],aLine[02],aLine[07])
+
+      aLine[oDoc:nColMtoITG]:=0
+      aLine[oDoc:nColPorITG]:=0
+
+      AINSERTAR(oBrw:aArrayData,nAt+1,aLine)
+
+      nAt:=nAt+1
+
+    ENDIF
+
+    IF lRefresh
+      oBrw:Refresh(.F.)
+      oBrw:nArrayAt:=nAt
+      // oBrw:CALTOTAL()
+    ENDIF
+
+RETURN .t.
+
+
 
 /*
 // Resuelve el residio del calculo de la Divisa
@@ -30,26 +105,68 @@ FUNCTION ADDRESIDUO(nExp,nValReq)
 
 RETURN nExp
 
-FUNCTION BRWCHANGE()
+/*
+// Colocar Banco
+*/
+FUNCTION PUTBANCO(oCol,uValue,nCol)
 RETURN .T.
 
-FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh)
+FUNCTION BRWCHANGEPAGOS()
+   LOCAL aLine:=oBrw:aArrayData[oBrw:nArrayAt]
+   LOCAL oCol :=oBrw:aCols[15]
+   LOCAL oDoc :=oBrw:oLbx
+
+//   oDp:oFrameDp:SetText(LSTR(LEN(aLine))+" VALTYPE ALINE[8]"+ValType(aLine[8]))
+
+   IF aLine[08]="BCO" .AND. oDoc:nMtoDoc>0 .AND. aLine[oDoc:nColSelP] .AND. LEN(oDp:aCuentaBco)>0
+
+      oCol:nEditType     :=EDIT_LISTBOX
+      oCol:aEditListTxt  :=ACLONE(oDp:aNombreBco)
+      oCol:aEditListBound:=ACLONE(oDp:aNombreBco)
+      oCol:bOnPostEdit   :={|oCol,uValue|oBrw:PUTBANCO(oCol,uValue,15)} // Debe seleccionar las cuentas bancarias
+      oBrw:DrawLine(.T.)
+      
+   ELSE
+
+      oCol:nEditType    :=0
+      oCol:bOnPostEdit  :=NIL
+
+   ENDIF
+
+RETURN .T.
+
+FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh,lTodo)
   LOCAL oBrw    :=oCol:oBrw
   LOCAL aLine   :=oBrw:aArrayData[oBrw:nArrayAt]
-  LOCAL aTotales:={}
+  LOCAL aTotal  :=ATOTALES(oBrw:aArrayData) // {}
   LOCAL nRowSel :=oBrw:nRowSel
   LOCAL nMtoCal :=0
   LOCAL nValReq :=oDoc:nMtoDoc
 
   DEFAULT lRefresh:=.T.,;
-          nAt     :=oBrw:nArrayAt
+          nAt     :=oBrw:nArrayAt,;
+          lTodo   :=.F.
 
   nMtoCal:=ROUND(uValue*aLine[2],2)
 
   oBrw:aArrayData[oBrw:nArrayAt,nCol]:=uValue
 
   nMtoCal:=oBrw:ADDRESIDUO(nMtoCal,nValReq)
-  oBrw:aArrayData[oBrw:nArrayAt,5   ]:=nMtoCal // ROUND(uValue*aLine[2],2)
+
+  // si es pago total asume el neto del documento
+
+  IF lTodo
+
+     nMtoCal:=oDoc:nMtoReqBSD  // oDoc:DOC_NETO-aTotal[05] // Pago total
+     nMtoCal:=IF(nMtoCal=0,uValue,nMtoCal)
+
+// ? nMtoCal,"nMtoCal",uValue,"uValue"
+
+     oBrw:aArrayData[oBrw:nArrayAt,4]:=nMtoCal/aLine[2]
+
+  ENDIF
+
+  oBrw:aArrayData[oBrw:nArrayAt,5]:=nMtoCal // ROUND(uValue*aLine[2],2)
 
   
   IF oDoc:nMtoIGTF=aLine[5] 
@@ -58,7 +175,11 @@ FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh)
 
   oBrw:aArrayData[oBrw:nArrayAt,oDoc:nColSelP]:=(uValue>0)
 
-  oBrw:SETSUGERIDO()
+//  IF !lTodo
+   oBrw:SETSUGERIDO()
+//  ELSE
+//    oBrw:CALIGTF(.T.)
+//  ENDIF
   // 15/10/2022  oBrw:aArrayData:=oRecDiv:CALDIVISA(oBrw:aArrayData,oBrw)
 
 RETURN .T.
@@ -166,8 +287,10 @@ FUNCTION TOTALRESDIVISA()
 RETURN NIL
 
 FUNCTION CALIGTF(lRefresh)
-   LOCAL aTotal:={},oCol,aTotalD
-  
+   LOCAL aTotal :={},oCol,aTotalD
+   LOCAL nAt    :=oBrw:nArrayAt
+   LOCAL nRowSel:=oBrw:nRowSel
+
    DEFAULT lRefresh:=.F.
 
    aTotal:=ATOTALES(oBrw:aArrayData)
@@ -190,6 +313,8 @@ FUNCTION CALIGTF(lRefresh)
    oDoc:nTotal :=oDoc:nTotal - IF(oDoc:lDifAnticipo,oDoc:nMtoAnticipo,0) // Excede -> Anticipo
    oDoc:nTotal :=INT(oDoc:nTotal*100)/100
 
+
+// ? oDoc:nTotal
    // 17/03/2023 Si el total de pagos es 0, el total debe ser su valor invertido
    IF oDoc:nMtoPag=0
       oDoc:nTotal:=oDoc:nMtoDoc*-1
@@ -216,7 +341,6 @@ FUNCTION CALIGTF(lRefresh)
    oBrw:RefreshFooters()
 
    
-
    oDoc:nMtoDoc     :=oDoc:DOC_NETO+oDoc:nMtoIGTF
 
 
@@ -228,8 +352,11 @@ FUNCTION CALIGTF(lRefresh)
 
    oDoc:nTotal:=oDoc:nMtoReqBSD*-1
 
-//? oDoc:nTotal,oDoc:nMtoReqBSD,"oDoc:nMtoReqBSD"
-
+   IF lRefresh
+     oBrw:Refresh(.F.)
+     oBrw:nArrayAt:=nAt
+     oBrw:nRowSel :=nRowSel
+   ENDIF
 
 RETURN .T. 
 

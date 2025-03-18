@@ -800,7 +800,9 @@ ENDIF
 
   @ 1,1 SAY oDocCli:oIVATEXT PROMPT "I.V.A."+IF(oDocCli:DOC_IVAREB>0,"-"+LSTR(oDocCli:DOC_IVAREB)+"%","")+"" RIGHT SIZE 42,12
 
-  @ 12,50 SAY oDocCli:oIVA PROMPT TRAN(oDocCli:nIva/IF(!oDocCli:lDivisaVer,1,oDocCli:DOC_VALCAM)  ,"999,999,999,999,999.99") RIGHT
+//  @ 12,50 SAY oDocCli:oIVA PROMPT TRAN(oDocCli:nIva/IF(!oDocCli:lDivisaVer,1,oDocCli:DOC_VALCAM)  ,"999,999,999,999,999.99") RIGHT
+
+  @ 12,50 SAY oDocCli:oIVA PROMPT TRAN(oDocCli:DOC_MTOIVA,"999,999,999,999,999.99") RIGHT
 
 IF !cTipDoc="PLA"
 
@@ -1793,9 +1795,11 @@ FUNCTION DOCCLIINI()
   LOCAL nClrBlink := CLR_YELLOW   // blinking color
   LOCAL nInterval := 500-100      // blinking interval in milliseconds
   LOCAL nStop     := 0            // blinking limit to stop in milliseconds
-  LOCAL oFontB
+  LOCAL oFontB,oDlg,oCursor,oBtn,oFont,nCol:=20
 
-  DEFINE FONT oFontB NAME "Times New Roman"   SIZE 0, -14 BOLD
+  DEFINE FONT oFontB NAME "Tahoma"   SIZE 0, -14 BOLD
+
+  DEFINE FONT oFont  NAME "Tahoma"   SIZE 0, -09 BOLD
 
   @360 + IIF(Empty(oDp:cModeVideo),0,160), 1 STSAY oDocCli:oSayMsgErr PROMPT oDocCli:cSayMsgErr OF oDocCli:oDlg PIXEL ;
            COLORS CLR_HRED SIZE 250, 19 FONT oFontB ;
@@ -1824,6 +1828,54 @@ FUNCTION DOCCLIINI()
 //  oDocCli:oDOC_CONDIC:bKeyDown:={|nKey| IIF(nKey=VK_F6, EVAL(oDocCli:oBtnCondic:bAction),NIL)}
 
   oDocCli:cCodCli:=oDocCli:cCodCli_
+
+  IF LEN(oDocCli:oFolder:aDialogs)>4
+
+     oDlg :=oDocCli:oFolder:aDialogs[5]
+
+     DEFINE CURSOR oCursor HAND
+     DEFINE BUTTONBAR oDocCli:oBarPago SIZE 45,45+3 OF oDlg 3D CURSOR oCursor
+
+     DEFINE BUTTON oBtn;
+             OF oDocCli:oBarPago;
+             NOBORDER;
+             FONT oFont;
+             FILENAME "BITMAPS\PASTE.BMP";
+             TOP PROMPT "Clonar";
+             ACTION oDocCli:oBrwPag:RUNCLICK(.T.)
+
+      DEFINE BUTTON oBtn;
+             OF oDocCli:oBarPago;
+             NOBORDER;
+             FONT oFont;
+             FILENAME "BITMAPS\CAJAS.BMP";
+             TOP PROMPT "Caja";
+             ACTION MsgMemo("AQUI")
+
+
+      oBtn:cToolTip:="Clonar"
+
+      DEFINE BUTTON oBtn;
+             OF oDocCli:oBarPago;
+             NOBORDER;
+             FONT oFont;
+             FILENAME "BITMAPS\BANCO.BMP";
+             TOP PROMPT "Banco";
+             ACTION MsgMemo("AQUI")
+
+
+      oDocCli:oBarPago:SetColor(CLR_BLACK,oDp:nGris)
+      AEVAL(oDocCli:oBarPago:aControls,{|o,n| o:Move(4,o:nLeft(),42,40+2,.T.), ;
+                                              nCol:=nCol+o:nWidth(),;
+                                              o:SetColor(CLR_BLACK,oDp:nGris)})
+
+      @    2,1+nCol SAY " Pagar "+oDp:cMoneda   +"  " OF oDocCli:oBarPago PIXEL FONT oFontB SIZE 90,20 COLOR oDp:nClrLabelText,oDp:nClrLabelPane PIXEL RIGHT BORDER
+      @ 23.0,1+nCol SAY " Pagar "+oDp:cMonedaExt+"  " OF oDocCli:oBarPago PIXEL FONT oFontB SIZE 90,20 COLOR oDp:nClrLabelText,oDp:nClrLabelPane PIXEL RIGHT BORDER
+
+      @    2,nCol+92 SAY oDocCli:oPagosBSD PROMPT FDP(oDocCli:nMtoReqBSD,"999,999,999,999.99") OF oDocCli:oBarPago PIXEL FONT oFontB SIZE 170,20 COLOR oDp:nClrYellowText,oDp:nClrYellow  PIXEL RIGHT BORDER
+      @ 23.0,nCol+92 SAY oDocCli:oPagosUSD PROMPT FDP(oDocCli:nMtoReqUSD,"999,999,999,999.99") OF oDocCli:oBarPago PIXEL FONT oFontB SIZE 170,20 COLOR oDp:nClrYellowText,oDp:nClrYellow  PIXEL RIGHT BORDER
+
+  ENDIF
 
 RETURN .T.
 
@@ -2186,6 +2238,11 @@ FUNCTION POSTGRABAR()
 
  oDocCli:SETFACAFE()
  EJECUTAR("DOCCLIAFTERSAVE",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_CODIGO,oDocCli:DOC_NUMERO,NIL,oDocCli:nOption)
+
+ // Crea el Recibo  y documentos de Caja
+ IF ValType(oDocCli:oBrwPag)="O"
+    EJECUTAR("DPFACTURAVTORECCLI",oDocCli)
+ ENDIF
 
  // 06/06/2024
  // Primero Cobra y luego Imprime
@@ -3481,7 +3538,13 @@ FUNCTION DPFACTURAV_HEAD()
   cTitle:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
  
   IF !oDp:cTipDoc="PLA"
+
+     // oDp:bFolderInit:={|oDlg,nOption| EJECUTAR("DPFACTURAVFOLDER",oDlg,nOption) }
+
      @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles","Datos Adicionales - Fletes","Terceros","Pago" OF oDocCli:oDlg SIZE 490,61
+
+     // oDp:bFolderInit:={|| NIL }
+
   ELSE
      @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles" OF oDocCli:oDlg SIZE 490,61
   ENDIF
@@ -3844,7 +3907,17 @@ FUNCTION VMOV_ALMORG()
 RETURN .T.
 
 FUNCTION CONFORME()
-  LOCAL lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO,oDocCli:DOC_CODIGO,oDocCli:DOC_SERFIS,oDocCli:cNomDoc)
+  LOCAL lResp
+
+  // si la factura requiere pago y no tiene pagos, va al folder pagos
+  IF oDocCli:lPagos .AND. oDocCli:nMtoPag<oDoc:DOC_NETO
+     oDocCli:oFolder:SetOption(5)
+     RETURN .F.
+  ENDIF
+  
+  oDocCli:oFolder:SetOption(1)
+  lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO,oDocCli:DOC_CODIGO,oDocCli:DOC_SERFIS,oDocCli:cNomDoc)
+
 RETURN lResp
 
 FUNCTION VALNOMBRE()
