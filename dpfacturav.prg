@@ -183,6 +183,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      oDp:lSerActivo :=DPSQLROW(5,.F.)
  
      IF !oDp:lSerActivo
+        EJECUTAR("RUNPDF","Series_Fiscales_para_Documentos_del_Cliente.pdf")
         MsgMemo("Serie Fiscal "+cLetra+" "+ALLTRIM(oDp:cModSerFis)+" "+oDp:cImpFisCom+" no está Activa","Por favor modificar el registre de Serie fiscal")
         oDp:oFrm:=EJECUTAR("DPSERIEFISCAL",3,cLetra)
         oDp:oFrm:oSFI_ACTIVO:VarPut(.T.,.T.)
@@ -1836,6 +1837,17 @@ FUNCTION DOCCLIINI()
      DEFINE CURSOR oCursor HAND
      DEFINE BUTTONBAR oDocCli:oBarPago SIZE 45,45+3 OF oDlg 3D CURSOR oCursor
 
+
+     DEFINE BUTTON oDocCli:oBntTodos;
+           OF oDocCli:oBarPago;
+           NOBORDER;
+           FONT oFont;
+           FILENAME "BITMAPS\MATH.BMP";
+           TOP PROMPT "Pagos"; 
+           ACTION oDocCli:oBrwPag:SETFILTERPAGOS(oDocCli:oBrwPag,"")
+
+     oDocCli:oBntTodos:cToolTip:="Ver solo Pagos"
+
      DEFINE BUTTON oBtn;
              OF oDocCli:oBarPago;
              NOBORDER;
@@ -1844,14 +1856,16 @@ FUNCTION DOCCLIINI()
              TOP PROMPT "Clonar";
              ACTION oDocCli:oBrwPag:RUNCLICK(.T.)
 
+      oBtn:cToolTip:="Clona Instrumento de pago, en el requiere realizar pagos múltiples o fraccionados"
+
+
       DEFINE BUTTON oBtn;
              OF oDocCli:oBarPago;
              NOBORDER;
              FONT oFont;
              FILENAME "BITMAPS\CAJAS.BMP";
              TOP PROMPT "Caja";
-             ACTION oDocCli:oBrwPag:SETCAJA(oDocCli:oBrwPag)
-
+             ACTION oDocCli:oBrwPag:SETFILTERPAGOS(oDocCli:oBrwPag,"CAJ")
 
       oBtn:cToolTip:="Instrumentos de Caja"
 
@@ -1861,7 +1875,7 @@ FUNCTION DOCCLIINI()
              FONT oFont;
              FILENAME "BITMAPS\BANCO.BMP";
              TOP PROMPT "Banco";
-             ACTION oDocCli:oBrwPag:SETBANCO(oDocCli:oBrwPag)
+             ACTION oDocCli:oBrwPag:SETFILTERPAGOS(oDocCli:oBrwPag,"BCO")
 
       oBtn:cToolTip:="Instrumentos de Bancos"
 
@@ -2621,7 +2635,8 @@ FUNCTION PREGRABAR(oForm,lSave)
    oDocCli:DOC_USUARI:="INC" // Para el disparado
 
    EJECUTAR("DPDOCCLIOTRDATSAVE",oDocCli)
-
+   
+   // Valida los pagos del Banco
 RETURN EJECUTAR("DPDOCCLIPREGRA",oDocCli,lSave)
 
 
@@ -3540,9 +3555,15 @@ FUNCTION DPFACTURAV_HEAD()
  
   IF !oDp:cTipDoc="PLA"
 
+     oDocCli:cPagos:="Anticipo"
+
+     IF ISDOCFISCAL(cTipDoc) .AND. cTipDoc<>"NEN"
+       oDocCli:cPagos:="Pago"
+     ENDIF
+
      // oDp:bFolderInit:={|oDlg,nOption| EJECUTAR("DPFACTURAVFOLDER",oDlg,nOption) }
 
-     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles","Datos Adicionales - Fletes","Terceros","Pago" OF oDocCli:oDlg SIZE 490,61
+     @ 1.35, 0 FOLDER oDocCli:oFolder ITEMS cTitle,"Campos Definibles","Datos Adicionales - Fletes","Terceros",oDocCli:cPagos OF oDocCli:oDlg SIZE 490,61
 
      // oDp:bFolderInit:={|| NIL }
 
@@ -3915,7 +3936,18 @@ FUNCTION CONFORME()
      oDocCli:oFolder:SetOption(5)
      RETURN .F.
   ENDIF
-  
+
+  // Validar Pagos con Bancos
+  IF ValType(oDocCli:oBrwPag)="O" .AND. !oDocCli:oBrwPag:VALPAGOBANCOS(oDocCli:oBrwPag)
+
+     IF oDocCli:cPagoFilter<>"BCO"
+        oDocCli:oBrwPag:SETFILTERPAGOS(oDocCli:oBrwPag,"BCO")
+     ENDIF
+
+     RETURN .F.
+  ENDIF
+
+ 
   oDocCli:oFolder:SetOption(1)
   lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO,oDocCli:DOC_CODIGO,oDocCli:DOC_SERFIS,oDocCli:cNomDoc)
 

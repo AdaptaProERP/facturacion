@@ -16,11 +16,13 @@ PROCE MAIN(oDoc)
       RETURN NIL
    ENDIF
 
-   oDoc:lCajaAct:=.F.
-   oDoc:lBancoAct:=.F.
+//   oDoc:lCajaAct :=.F.
+//   oDoc:lBancoAct:=.F.
+//   oDoc:aCajaAct  :={}
+//   oDoc:aBancoAct :={}
 
-   oDoc:aCajaAct:={}
-   oDoc:aBancoAct:={}
+   oDoc:cPagoFilter :=""
+   oDoc:aDataHide   :={}
  
    oDoc:lDifCambiario:=.F. 
    oDoc:cCodCaja     :=oDp:cCodCaja

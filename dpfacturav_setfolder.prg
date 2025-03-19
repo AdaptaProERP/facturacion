@@ -15,15 +15,22 @@ PROCE MAIN(oDoc,lReset)
 
   IF lReset .AND. LEN(oDoc:oFolder:aDialogs)>4
 
-     oDoc:nMtoPag     :=0
-     oDoc:nMtoIGTF    :=0
-     oDoc:nMtoReqBSD  :=0 
-     oDoc:nMtoReqUSD  :=0 // Necesario para PRE-GRABAR
+    oDoc:nMtoPag     :=0
+    oDoc:nMtoIGTF    :=0
+    oDoc:nMtoReqBSD  :=0 
+    oDoc:nMtoReqUSD  :=0 // Necesario para PRE-GRABAR
 
-     AEVAL(oDoc:oBrwPag:aArrayData,{|a,n| oDoc:oBrwPag:aArrayData[n,03]:=0,;
+    IF ValType(oDoc:oBrwPag)="O"
+
+       oDoc:oBrwPag:PAGRESET(oDoc)
+
+/*
+        AEVAL(oDoc:oBrwPag:aArrayData,{|a,n| oDoc:oBrwPag:aArrayData[n,03]:=0,;
                                           oDoc:oBrwPag:aArrayData[n,04]:=0,;
                                           oDoc:oBrwPag:aArrayData[n,05]:=0,;
                                           oDoc:oBrwPag:aArrayData[n,12]:=0})
+*/
+     ENDIF
 
      oDoc:oFolder:SetOption(1)
 
