@@ -45,8 +45,9 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   oData:End()
 
   // Puerto Serial Impresora
-  oDp:cImpFisCom:=""
-  oDp:cModSerFis:=""
+  oDp:lImpFisPago:=.F. // SERIE FISCAL, INDICA REQUIERE SER PAGADA
+  oDp:cImpFisCom :=""
+  oDp:cModSerFis :=""
  
 
   // EJECUTAR("DPSERIEFISCALLOAD")
@@ -168,9 +169,10 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   IF !Empty(cLetra) .AND. lLibVta .AND. !lView
 
      IF cLetra<"00" .OR. cLetra>"99"
+        EJECUTAR("SPEAK_LIVE","DP\requiere_implementar_series_fiscales.txt")
         EJECUTAR("RUNPDF","Series_Fiscales_para_Documentos_del_Cliente.pdf")
-        // EJECUTAR("WEBRUN","https://adaptaproerp.com/series-fiscales/",.f.)
-        MsgMemo("Serie Fiscal ["+cLetra+"] Inválida para realizar documentos fiscales","Ejecute la Implementación de la Serie Fiscal")
+        EJECUTAR("WEBRUN","https://adaptaproerp.com/series-fiscales/",.f.)
+        MsgMemo("Serie Fiscal ["+cLetra+"] Inválida para realizar documentos fiscales, debe ser 00,01,02..99","Ejecute la Implementación de la Serie Fiscal")
         DPLBX("DPSERIEFISCAL.LBX")
         RETURN NIL
      ENDIF
@@ -183,7 +185,11 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      oDp:lSerActivo :=DPSQLROW(5,.F.)
  
      IF !oDp:lSerActivo
+
         EJECUTAR("RUNPDF","Series_Fiscales_para_Documentos_del_Cliente.pdf")
+        EJECUTAR("WEBRUN","https://adaptaproerp.com/series-fiscales/",.f.)
+        EJECUTAR("SPEAK_LIVE","DP\requiere_implementar_series_fiscales.txt")
+
         MsgMemo("Serie Fiscal "+cLetra+" "+ALLTRIM(oDp:cModSerFis)+" "+oDp:cImpFisCom+" no está Activa","Por favor modificar el registre de Serie fiscal")
         oDp:oFrm:=EJECUTAR("DPSERIEFISCAL",3,cLetra)
         oDp:oFrm:oSFI_ACTIVO:VarPut(.T.,.T.)
@@ -421,7 +427,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   oDocCli:oBrwPag      :=NIL
   oDocCli:nMtoIGTF     :=0
   oDocCli:nTotal       :=0
-
+  oDocCli:lImpFisPago  :=oDp:lImpFisPago
 
   oDocCli:SETOTROSDATOS()
 
@@ -2590,13 +2596,15 @@ RETURN
 
 // Pre-Grabar
 FUNCTION PREGRABAR(oForm,lSave)
-
    // necesario guardar la serie fiscal
    oDocCli:DOC_SERFIS:=oDocCli:cLetra
    IF oDocCli:nIva=0
       oDocCli:DOC_MTOEXE:=oDocCli:DOC_NETO
    ENDIF
 
+   IF !lSave
+      oDocCli:DOC_NUMFIS:=""
+   ENDIF
 
    IF (oDocCli:cTipDoc="PLA" .AND. (!Empty(oDocCli:cDescri) .OR. oDocCli:DOC_NUMMEM>0))
 
@@ -2638,7 +2646,6 @@ FUNCTION PREGRABAR(oForm,lSave)
    
    // Valida los pagos del Banco
 RETURN EJECUTAR("DPDOCCLIPREGRA",oDocCli,lSave)
-
 
 // Consultar Cliente
 FUNCTION CONCLIENTE()
@@ -3932,7 +3939,9 @@ FUNCTION CONFORME()
   LOCAL lResp
 
   // si la factura requiere pago y no tiene pagos, va al folder pagos
-  IF oDocCli:lPagos .AND. oDocCli:nMtoPag<oDoc:DOC_NETO
+  // oDocCli:lPagos .AND. oDocCli:nMtoPag<oDoc:DOC_NETO
+
+  IF oDocCli:lImpFisPago .AND. oDocCli:nMtoPag<oDoc:DOC_NETO
      oDocCli:oFolder:SetOption(5)
      RETURN .F.
   ENDIF
@@ -3945,8 +3954,8 @@ FUNCTION CONFORME()
      ENDIF
 
      RETURN .F.
-  ENDIF
 
+  ENDIF
  
   oDocCli:oFolder:SetOption(1)
   lResp:=EJECUTAR("DOCCLICONFIRMA",oDocCli:DOC_CODSUC,oDocCli:DOC_TIPDOC,oDocCli:DOC_NUMERO,oDocCli:DOC_CODIGO,oDocCli:DOC_SERFIS,oDocCli:cNomDoc)

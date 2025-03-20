@@ -17,7 +17,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar
    LOCAL nHeight:=180+20 // Alto
    LOCAL oFontB :=NIL
    LOCAL oBar,oRep,bBlq,cKey,cCodRep
-   LOCAL cNumFis:=SPACE(10),cNum8,oGet8
+   LOCAL cNumFis:=SPACE(10),cNum8,oGet8, oEstado,oNumFis
   
    DEFAULT cCodSuc:=oDp:cSucursal,;
            cTipDoc:="FAV",;
@@ -33,11 +33,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar
            "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
            "DOC_TIPTRA"+GetWhere("=","D"    )
 
+   // Obtiene los valores impositivos
+
    EJECUTAR("DPDOCCLIIMP",cCodSuc,cTipDoc,cCodCli,cNumero,lSave,nDesc,nRecarg,nDocOtros,cOrigen,nIvaReb,cDocOrg,nAct)
 
    aData:={}
-
-//  ViewArray(oDp:aArrayIva)
 
    FOR I=1 TO LEN(oDp:aArrayIva)
 
@@ -55,6 +55,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar
   aTotal :=ATOTALES(aData)
 
   cNumFis:=EJECUTAR("DPDOCCLIGETNUMFIS",cCodSuc,cLetra,cTipDoc,cNumero)
+
   // cNum8  :=RIGHT(cNumFis,8)
   cDescri:="Confirmar : "+ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
 
@@ -206,7 +207,7 @@ FUNCTION DLGBAR()
           FONT oFont;
           TOP PROMPT "Aceptar"; 
           FILENAME "BITMAPS\XSAVE.BMP";
-          ACTION (lResp:=.T.,oDlg:End())
+          ACTION (lResp:=VALIDARFISCAL(),IF(lResp,oDlg:End(),NIL))
 
    DEFINE BUTTON oBtn;
           OF oBar;
@@ -252,13 +253,25 @@ FUNCTION DLGBAR()
                BORDER;
                COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 110,20
 
+  @ 44,nCol+175 SAY oEstado VAR " "+oDp:cDocFisEstado+" " OF oBar ;
+               PIXEL ;
+               BORDER;
+               COLOR oDp:nClrYellowText,oDp:nClrYellow FONT oFont SIZE 087,20
 
 RETURN .T.
 
 /*
-// no puede estar asociado con otro documento
+// Buscamos en el talonario digital, si el formato esta disponible
+// Si es forma libre, no necesita validar el tipo de documento
 // tampoco puede dejar espacios vacios
 */
-FUNCTION VALNUMFISCAL()
+FUNCTION VALIDARFISCAL()
+
+  cNumFis:=EJECUTAR("DPDOCCLIGETNUMFIS",cCodSuc,cLetra,cTipDoc,cNumero)
+  oEstado:Refresh(.T.)
+  oNumFis:Refresh(.T.)
+
+  SQLUPDATE("dpdocclinum",{"DCN_TIPDOC","DCN_NUMDOC","DCN_ESTADO"},{cTipDoc,cNumero,"U"},oDp:cWhereDocCliNum)
+
 RETURN .T.
 // EOF

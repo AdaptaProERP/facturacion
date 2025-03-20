@@ -41,6 +41,19 @@ FUNCTION RUNCLICK(lClonar)
 
    ENDIF
 
+RETURN .T.
+
+// Incluir requiere Resetear Pagos
+FUNCTION PAGRESET(oDoc)
+
+    IF ValType(oDocCli:oBrwPag)="O"
+
+      oDoc:oBrwPag:aArrayData:=ACLONE(oDoc:aDataPagos)
+      oDoc:oBrwPag:nArrayAt:=1
+      oDoc:oBrwPag:nRowSel :=1
+      oDoc:oBrwPag:Refresh(.F.)
+
+    ENDIF
 
 RETURN .T.
 
@@ -146,19 +159,69 @@ FUNCTION PUTBANCO(oCol,uValue,nCol)
 
 RETURN .T.
 
-FUNCTION SETMARCAF()
-? "SETMARCAF"
+FUNCTION SETMARCAF(cCodCta)
+   LOCAL cTipIns :=oBrw:aArrayData[oBrw:nArrayAt,09] // Instrumento Bancario
+   LOCAL aMarcasF:=ACLONE(oDp:aBancoTipIslr)
+   LOCAL oColEdit:=oBrw:aCols[14]
 
-RETURN NIL
+   DEFAULT aMarcasF:={}
 
-FUNCTION PUTCUENTA()
-  ? "PUTCUENTA"
+   ADEPURA(aMarcasF,{|a,n|!a[2]=cTipIns})
+
+   IF !Empty(cCodCta) 
+     ADEPURA(aMarcasF,{|a,n|!a[1]=LEFT(cCodCta,4)})
+   ENDIF
+
+   AEVAL(aMarcasF,{|a,n| aMarcasF[n]:=a[3]})
+
+   IF !Empty(aMarcasF)
+
+     oBrw:aArrayData[oBrw:nArrayAt,14]:=aMarcasF[1]
+
+     oColEdit:nEditType     :=EDIT_LISTBOX
+     oColEdit:aEditListTxt  :=ACLONE(aMarcasF)
+     oColEdit:aEditListBound:=ACLONE(aMarcasF)
+     // oColEdit:bOnPostEdit   :={|oCol,uValue|oCol:oBrw:PUTMARCAF(oCol,uValue,14)} // Debe seleccionar las cuentas bancarias
+//     oBrw:nColSel   :=14
+
+   ELSE
+
+     oColEdit:nEditType     :=1 // debe introducirlo manualmente
+
+     oBrw:aArrayData[oBrw:nArrayAt,14]:=IF(Empty(aMarcasF),SPACE(20),aMarcasF[1])
+//     oBrw:nColSel   :=14
+   ENDIF
+
+   oBrw:nColSel   :=14
+   oColEdit:bOnPostEdit   :={|oCol,uValue|oCol:oBrw:PUTMARCAF(oCol,uValue,14)} // Debe seleccionar las cuentas bancarias
+
 RETURN .T.
 
-FUNCTION PUTREFERENCIA()
-? "PUTREFERENCIA("
+FUNCTION PUTMARCAF(oCol,uValue,nCol)
+
+   oCol:oBrw:aArrayData[oCol:oBrw:nArrayAt,nCol]:=uValue
+   oCol:oBrw:DrawLine(.T.)
+
+   IF Empty(oCol:oBrw:aArrayData[oCol:oBrw:nArrayAt,17])
+      oBrw:nColSel   :=17 // Solicita Referencia
+   ENDIF
+
+
 RETURN .T.
 
+FUNCTION PUTCUENTA(oCol,uValue,nCol)
+
+   oCol:oBrw:aArrayData[oCol:oBrw:nArrayAt,nCol]:=uValue
+   oCol:oBrw:DrawLine(.T.)
+
+RETURN .T.
+
+FUNCTION PUTREFERENCIA(oCol,uValue,nCol)
+
+  oCol:oBrw:aArrayData[oCol:oBrw:nArrayAt,nCol]:=uValue
+  oCol:oBrw:DrawLine(.T.)
+
+RETURN .T.
 
 FUNCTION PUTMONTO(oCol,uValue,nCol,nAt,lRefresh,lTodo)
   LOCAL oBrw    :=oCol:oBrw
@@ -396,82 +459,135 @@ FUNCTION CALSUG(nMtoSug,nMoneda,cCodMon)
 
 RETURN nMonto
 
-FUNCTION SETCAJA(oBrw)
-  LOCAL nAt    :=oBrw:nArrayAt
+FUNCTION SETFILTERPAGOS(oBrw,cTipDoc)
+  LOCAL nAt    :=oBrw:nArrayAt,I
   LOCAL nRowSel:=oBrw:nRowSel
-  LOCAL aData  :={}
+  LOCAL aData  :=ACLONE(oBrw:aArrayData)
   LOCAL oDoc   :=oBrw:oLbx
 
-  IF !Empty(oDoc:aBancoAct)
-     AEVAL(oDoc:aBancoAct,{|a,n| AADD(oBrw:aArrayData,a)})
-     aData  :=ACLONE(oBrw:aArrayData)
-     oDoc:aBancoAct:={}
+  IF Empty(oDoc:nMtoPag) .AND. Empty(cTipDoc)
+     oDoc:oBntTodos:MsgErr("Requiere Registro de Pago","Función no podrá ejecutarse")
+     RETURN .F.
   ENDIF
 
-  // Apagar, Copia todos Componentes de Caja
-  IF Empty(oDoc:aCajaAct)
-
-     aData        :=ACLONE(oBrw:aArrayData)
-     oDoc:aCajaAct:=ACLONE(aData)
-
-     ADEPURA(oDoc:aCajaAct,{|a,n| a[oDoc:nColCajBco]<>"BCO" .AND. a[5]<>0})
-     ADEPURA(aData        ,{|a,n| a[oDoc:nColCajBco]="BCO"  .AND. a[5]= 0})
-
-     nAt:=MIN(nAt,LEN(aData))
-
+  IF !Empty(oDoc:aDataHide)
+     oBrw:aArrayData:=ACLONE(oDoc:aDataHide)
+     oDoc:aDataHide :={}
   ELSE
-
-     aData         :=ACLONE(oDoc:aBancoAct)
-     oDoc:aBancoAct:={}
-
-  ENDIF
-
-  oBrw:aArrayData:=ACLONE(aData)
-  oBrw:nArrayAt:=1
-  oBrw:nRowSel :=1
-  oBrw:Refresh(.F.)
-
-RETURN .T.
-
-FUNCTION SETBANCO(oBrw)
-  LOCAL nAt    :=oBrw:nArrayAt
-  LOCAL nRowSel:=oBrw:nRowSel
-  LOCAL aData  :={} 
-  LOCAL oDoc   :=oBrw:oLbx
- 
-  IF !Empty(oDoc:aCajaAct)
-     AEVAL(oDoc:aCajaAct,{|a,n| AADD(oBrw:aArrayData,a)})
      aData  :=ACLONE(oBrw:aArrayData)
-     oDoc:aCajaAct:={}
+     oBrw:aArrayData:={}
   ENDIF
-
- // Apagar, Copia todos Componentes de Caja
-
-  IF Empty(oDoc:aBancoAct)
-
-     aData         :=ACLONE(oBrw:aArrayData)
-     oDoc:aBancoAct:=ACLONE(aData)
   
-     ADEPURA(oDoc:aBancoAct,{|a,n| a[oDoc:nColCajBco]<>"CAJ" .AND. a[5]<>0})
-     ADEPURA(aData,{|a,n| a[oDoc:nColCajBco]="CAJ" .AND. a[5]=0})
+  // Copiamos los Hide
+  
+  FOR I=1 TO LEN(aData)
+  
+   IF aData[I,5]<>0 .OR. (!Empty(cTipDoc) .AND. aData[I,oDoc:nColCajBco]=cTipDoc)
+      AADD(oBrw:aArrayData,aData[I])
+   ELSE
+      AADD(oDoc:aDataHide ,aData[I])
+   ENDIF
 
-     nAt:=MIN(nAt,LEN(aData))
+  NEXT I
+ 
+  // los pagos van primero
+  oBrw:aArrayData:=ASORT(oBrw:aArrayData,,, { |x, y| x[5] > y[5] })
 
-  ELSE
+  oBrw:aCols[1]:cFooter      :="#"+LSTR(LEN(oBrw:aArrayData)) // FDP(aTotal[4],"999,999,999.99")
 
-     aData:=ACLONE(oDoc:aBancoAct)
-     // AEVAL(oDoc:aBancoAct,{|a,n| AADD(aData,a)})
-     oDoc:aBancoAct:={}
-
-  ENDIF
-
-  oBrw:aArrayData:=ACLONE(aData)
   oBrw:nArrayAt:=1
   oBrw:nRowSel :=1
   oBrw:Refresh(.F.)
+ 
+RETURN .T.
 
+/*
+// Valida el Banco
+*/
+FUNCTION VALPAGOBANCOS(oBrw)
+  LOCAL I,aLine,nAt,aData:=ACLONE(oBrw:aArrayData)
+  LOCAL cTipDoc,cCtaBco,cCodBco,cError:="",cNumero,lResp:=.T.,cLine:="",aError:={}
+  LOCAL nColSel:=0
+  LOCAL nRowErr:=0
+
+  IF Empty(aData)
+     RETURN .T.
+  ENDIF
+
+  ADEPURA(aData,{|a,n| a[8]="BCO"})
+//  ADEPURA(aData,{|a,n| a[5]=0})
+
+ViewArray(aData)
+
+  // no hay pago bancario
+  IF Empty(aData)
+     RETURN .T.
+  ENDIF
 
 RETURN .T.
+
+  nAt:=oBrw:nArrayAt
+
+  FOR I=1 TO LEN(aData)
+
+    cError :=""
+
+    cWhere :=""
+    aLine  :=aData[I]
+    cLine  :=ALLTRIM(aLine[1])+" Monto="+ALLTRIM(FDP(aLine[5],"999,999,999,999.99"))
+    cTipDoc:=aData[I,09]
+    cCtaBco:=aData[I,16]
+    cNumero:=aData[I,17]
+    cCodBco:=SQLGET("DPCTABANCO","BCO_CODIGO","BCO_CTABAN"+GetWhere("=",cCtaBco))
+    cError :=""
+
+    IF Empty(cCtaBco)
+      cError :="Falta=Cuenta Bancaria"     
+      nColSel:=IF(nColSel=0,15,nColSel)
+    ENDIF
+
+    IF Empty(cCodBco)
+      cError:=cError+IF(Empty(cError),"",",")+" Falta=Cód. del Banco" 
+      nColSel:=IF(nColSel=0,16,nColSel)
+    ENDIF
+
+    IF Empty(cNumero)
+       cError:=cError+IF(Empty(cError),"",",")+" Falta=Número de Referencia" 
+       nColSel:=IF(nColSel=0,17,nColSel)
+    ENDIF
+   
+    IF !Empty(cError)
+      AADD(aError,{cLine,cError})
+      nRowErr:=I
+    ENDIF
+
+  NEXT I
+
+  IF !Empty(aError)
+
+     oBrw:nColSel:=1
+     EJECUTAR("MSGBROWSE",aError,"Complete los Datos", NIL  ,200-50  ,NIL       ,NIL  ,.T., oBrw)
+
+     oBrw:Refresh(.T.)
+     oBrw:nArrayAt  :=nRowErr
+     oBrw:nRowSel   :=nRowErr
+
+     IF LEN(aData)=1
+       oBrw:nColSel   :=nColSel
+     ELSE
+       oBrw:nColSel   :=15
+     ENDIF
+
+     lResp:=.F.
+
+  ENDIF
+
+RETURN lResp
+// EOF
+
+
+
+
 // EOF
 
 

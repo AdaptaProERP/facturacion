@@ -11,6 +11,7 @@
 PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
     LOCAL cNumero:="",lZero:=NIL,nLen:=NIL,cNumAnt:="",cWhere:="",oData
     LOCAL cNumCtr,cSerFis,cNumFis,cOcho:=STRZERO(0,8),cMax,nContar:=0
+    LOCAL cWhere:="",cUltimo,oTalonario
 
     DEFAULT cTipDoc:="FAV"
 
@@ -41,17 +42,80 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
           RETURN cNumero
        ENDIF
 
-    ENDIF
+   ENDIF
 
+   /*
+   // Impresoras fiscales que no proveen numero deberá ubicar el ultimo número
+   */
+   IF "_FISCAL"$oDp:cImpFiscal 
+      ? "AQUI DEBE GENERAR IMPRESORA FISCAL"
+      RETURN cNumero
+   ENDIF
+
+
+   /*
+   // Código basado en talonarios (FORMATO,SERIE FISCAL O FACTURA DIGITAL)
+   */
+
+   IF "LIBRE"$oDp:cImpFiscal .OR. "DIGI"$oDp:cImpFiscal
+
+     cWhere:=" DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
+             " DOC_SERFIS"+GetWhere("=",cSerie )+" AND "+;
+             " DOC_TIPTRA"+GetWhere("=","D"    )
+   ELSE
+
+     // FORMATO UTILIZA EXCLUSIVO POR TIPO DE DOCUMENTO
+
+     cWhere:=" DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
+             " DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
+             " DOC_SERFIS"+GetWhere("=",cSerie )+" AND "+;
+             " DOC_TIPTRA"+GetWhere("=","D"    )
+   ENDIF
+
+   cWhere:=cWhere+"  AND DOC_NUMFIS"+GetWhere("<>","")
+
+   cUltimo:=SQLGET("DPDOCCLI","DOC_NUMFIS",cWhere+" ORDER BY DOC_NUMFIS DESC LIMIT 1")
+   cNumero:=DPINCREMENTAL(cUltimo)
+
+   /*
+   // Buscamos estado del documento fiscal en el Talonario,
+   */
+
+   cWhere           :="DCN_CODSUC"+GetWhere("=",cCodSuc)
+   oDp:cDocFisEstado:=""
+
+   IF !"LIBRE"$cImpFis
+     cWhere:=cWhere+" AND DCN_TIPDOC"+GetWhere("=",cTipDoc)
+   ENDIF
+
+   cWhere :=cWhere+" AND DCN_SERFIS"+GetWhere("=",cSerie)+;
+                   " AND DCN_NUMERO"+GetWhere("=",RIGHT(cNumero,8))
+
+   oDp:cWhereDocCliNum:=cWhere
+
+   oDp:cDocFisEstado:=SQLGET("dpdocclinum","DCN_ESTADO",cWhere)
+
+   IF oDp:cDocFisEstado="D"
+      oDp:cDocFisEstado:="Disponible"
+   ENDIF
+
+   IF oDp:cDocFisEstado="N"
+      oDp:cDocFisEstado:="Nulo"
+   ENDIF
+
+   IF oDp:cDocFisEstado="U"
+      oDp:cDocFisEstado:="Utilizado"
+   ENDIF
+
+RETURN cNumero
+
+/*
     oData  :=DATASET("SUC_V"+oDp:cSucursal,"ALL")
 
     cNumCtr:=oData:Get(cTipDoc+"Numero","")
     cSerFis:=oData:Get(cTipDoc+"Serie" ,"")
     cNumFis:=oData:Get(cTipDoc+"NumFis","")
     oData:End(.F.)
-
-// ? cCodSuc,cSerie,cTipDoc,"cCodSuc,cSerie,cTipDoc"
-// ? cNumCtr,cSerFis,cNumFis,"cNumCtr,cSerFis,cNumFis"
 
     DEFAULT cCodSuc:=oDp:cSucursal,;
             cSerie :=SQLGET("DPSERIEFISCAL","SFI_LETRA","SFI_LETRA"+GetWhere("<>","")+" AND SFI_ACTIVO=1 ORDER BY SFI_LETRA")
@@ -97,8 +161,6 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
        cMax:=cNumAnt
     ENDIF
 
-// ? cMax,"cMax1"
-
     WHILE ++nContar<100
 
        cMax:=EJECUTAR("DPINCREMENTAL",cMax)
@@ -108,8 +170,6 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
        ENDIF
 
     ENDDO
-
-//? cMax,"EL MAXIMO",cNumero
 
     IF !Empty(cMax)
 
@@ -133,4 +193,5 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
     ENDIF
  
 RETURN cNumero
+*/
 // EOF

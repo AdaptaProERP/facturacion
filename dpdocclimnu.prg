@@ -79,6 +79,16 @@ PROCE MAIN(cCodSuc,cNumero,cCodigo,cNomDoc,cTipDoc,oForm,cAction,cDocOrg)
                                              "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
                                              "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;                 
                                              "DOC_TIPTRA"+GetWhere("=","D"    ))
+
+// inncesario, es lento al finalizar la factura
+//     cActual:=EJECUTAR("DPDOCVIEWCON",oForm:DOC_CODSUC,oForm:DOC_TIPDOC,oForm:DOC_CODIGO,oForm:DOC_NUMERO,"D",.T.,.F.)
+
+   ENDIF
+
+   // 20/03/2025
+   IF !Empty(cNumCbt)
+     cActual:=SQLGET("DPCBTE","CBT_ACTUAL","CBT_CODSUC"+GetWhere("=",cCodSuc)+" AND CBT_FECHA"+GetWhere("=",dFecha)+" AND DOC_NUMERO"+GetWhere("=",cNumCbt))
+     ? cActual,oDp:cSql
    ENDIF
 
    IF cEstado="A"
@@ -104,12 +114,13 @@ PROCE MAIN(cCodSuc,cNumero,cCodigo,cNomDoc,cTipDoc,oForm,cAction,cDocOrg)
    ENDIF
 
    // Revisar si está actualizado, para no mostrar boton de contabilizar.
+/*
    IF !oForm=NIL
      cActual:=EJECUTAR("DPDOCVIEWCON",oForm:DOC_CODSUC,oForm:DOC_TIPDOC,oForm:DOC_CODIGO,oForm:DOC_NUMERO,"D",.T.,.F.)
    ELSE
      cActual:="N"
    ENDIF
-
+*/
    IF ValType(oForm)="O" .AND. oDoc:lPar_Contab .AND. nInvCon<>0 .AND. cEstado<>"N" .AND. cActual <> "S" .AND. oDp:cIdApl<>"1"
      AADD(aBtn,{"Contabilizar "+IF(!Empty(cNumCbt),"("+cNumCbt+")",""),"CONTABILIZAR.BMP"       ,"CONTAB" })
    ENDIF
@@ -283,9 +294,8 @@ PROCE MAIN(cCodSuc,cNumero,cCodigo,cNomDoc,cTipDoc,oForm,cAction,cDocOrg)
    oDpCliMnu:lPagos    :=lPagos
    oDpCliMnu:cDocOrg   :=cDocOrg
 
-	
-//   oDpCliMnu:Windows(0,0,400+50+160,410+5)
-   oDpCliMnu:Windows(0,0,aCoors[3]-160-20,415)  
+
+   oDpCliMnu:Windows(0,0,aCoors[3]-150-00,415)  
 
 /*
   @ 48, -1 OUTLOOK oDpCliMnu:oOut ;
