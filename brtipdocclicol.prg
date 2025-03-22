@@ -37,7 +37,7 @@ PROCE MAIN(cWhere,cCodSuc,nPeriodo,dDesde,dHasta,cTitle,cTipDoc)
    ENDIF 
 
    DEFAULT cTipDoc:="FAV",;
-           cWhere :="CTD_TIPDOC"+GetWhere("=",cTipDoc)+" AND CTD_FIELD"+GetWhere("=","MOV_CODCOM")
+           cWhere :="CTD_TIPDOC"+GetWhere("=",cTipDoc)+" AND CTD_FIELD"+GetWhere("=","MOV_IMPOTR")
 
    IF COUNT("DPTIPDOCCLICOL",cWhere)=0
 
@@ -516,8 +516,6 @@ IF oTIPDOCCLICOL:lBtnQuery
    oBtn:cToolTip:="Imprimir"
 
 ENDIF
-
-
 
 
    DEFINE BUTTON oBtn;

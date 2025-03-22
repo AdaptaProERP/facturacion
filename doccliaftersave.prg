@@ -9,7 +9,7 @@
 #INCLUDE "DPXBASE.CH"
 
 PROCE MAIN(cCodSuc,cTipDoc,cCodigo,cNumero,cDirTo,nOption)
-   LOCAL cTipPro:="XXJ",cSql,cDb,cTipDes,oTable
+   LOCAL cTipPro:="XXJ",cSql,cDb,cTipDes,oTable,cTipTra:="D"
    LOCAL cRif,cCodEmp,oDoc,oMov,oInv,oCli
 
    DEFAULT cTipDoc:="FAV",;
@@ -25,12 +25,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cCodigo,cNumero,cDirTo,nOption)
    ENDIF
 
    cNumero:=ALLTRIM(cNumero)
-
-  
-
    cTipPro:=SQLGET("DPTIPDOCCLI","TDC_TIPPRO,TDC_DOCDES","TDC_TIPO"+GetWhere("=",cTipDoc))
    cTipDes:=DPSQLROW(2,"")
-
 
 ? "CREAR DOCUMENTO DESTINO",cTipPro,cTipDes
 

@@ -10,11 +10,22 @@
 
 PROCE MAIN(cLetra,cModelo,cCodSuc)
    LOCAL cWhere:="",I
-   LOCAL aSerie:=ATABLE("SELECT DOC_SERFIS FROM dpdoccli LEFT JOIN dpseriefiscal ON DOC_SERFIS=SFI_LETRA WHERE SFI_MODELO IS NULL GROUP BY DOC_SERFIS")
+   LOCAL aSerie:={}
 
-   DEFAULT cLetra :=SPACE(1),;
+   DEFAULT cLetra :=SPACE(2),;
            cModelo:="NO-FISCAL",;
            cCodSuc:=oDp:cSucursal
+
+   IF !EJECUTAR("DBISTABLE",oDp:cDsnData,"DPTIPDOCCLINUM",.F.)
+      EJECUTAR("DPTIPDOCCLINUM_CREA")
+   ENDIF
+
+   EJECUTAR("SETFIELDLONG","DPDOCCLI"      ,"DOC_SERFIS",02) 
+   EJECUTAR("SETFIELDLONG","DPSERIEFISCAL" ,"SFI_MODELO"  ,20) 
+   EJECUTAR("SETFIELDLONG","DPSERIEFISCAL" ,"SFI_LETRA" ,02) 
+   EJECUTAR("SETFIELDLONG","DPTIPDOCCLINUM","TDN_SERFIS",02) 
+
+   aSerie:=ATABLE("SELECT DOC_SERFIS FROM dpdoccli LEFT JOIN dpseriefiscal ON DOC_SERFIS=SFI_LETRA WHERE SFI_MODELO IS NULL GROUP BY DOC_SERFIS")
 
    cWhere:="SFI_LETRA"+GetWhere("=",cLetra)
 
@@ -34,6 +45,8 @@ PROCE MAIN(cLetra,cModelo,cCodSuc)
                                              NIL,.T.,cWhere)
 
    NEXT I
+
+   EJECUTAR("DPSERIEFISCALFIX")
 
 RETURN .T.
 /*

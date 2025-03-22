@@ -68,8 +68,8 @@ FUNCTION RECGRABAR(oDocFav)
   oDocCli:cNomCli :=oDocCli:oCliNombre:GetText()
   oDocCli:lCliente:=.T.
 
-//  EJECUTAR("DPRECIBODIVBANCO",oDocFav,oDocFav:cCodSuc,aData,cNumero,oDocFav:cCodigo,oDocFav:cCodCaja,oDocFav:dFecha,oDocFav:cNomCli)
-  EJECUTAR("DPRECIBODIVCAJA" ,oDocFav,oDocFav:DOC_CODSUC,aData,cNumero,oDocFav:DOC_CODIGO,oDocFav:cCodCaja,oDocFav:DOC_FECHA,oDocFav:cNomCli)
+  EJECUTAR("DPRECIBODIVBANCO",oDocFav,oDocFav:DOC_CODSUC,ACLONE(aData),cNumero,oDocFav:DOC_CODIGO,oDocFav:cCodCaja,oDocFav:DOC_FECHA,oDocFav:cNomCli,NIL,oRecibo)
+  EJECUTAR("DPRECIBODIVCAJA" ,oDocFav,oDocFav:DOC_CODSUC,ACLONE(aData),cNumero,oDocFav:DOC_CODIGO,oDocFav:cCodCaja,oDocFav:DOC_FECHA,oDocFav:cNomCli)
 
   // numero del Recibo de Ingreso
   cWhere:="DOC_CODSUC"+GetWhere("=",oDocFav:DOC_CODSUC)+" AND "+;
@@ -78,6 +78,8 @@ FUNCTION RECGRABAR(oDocFav)
           "DOC_TIPTRA"+GetWhere("=","D")
 
   SQLUPDATE("DPDOCCLI","DOC_RECNUM",cNumero,cWhere)
+
+  oRecibo:End()
 
 ? oDp:cSql
 

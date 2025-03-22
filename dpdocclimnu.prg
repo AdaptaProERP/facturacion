@@ -88,7 +88,7 @@ PROCE MAIN(cCodSuc,cNumero,cCodigo,cNomDoc,cTipDoc,oForm,cAction,cDocOrg)
    // 20/03/2025
    IF !Empty(cNumCbt)
      cActual:=SQLGET("DPCBTE","CBT_ACTUAL","CBT_CODSUC"+GetWhere("=",cCodSuc)+" AND CBT_FECHA"+GetWhere("=",dFecha)+" AND DOC_NUMERO"+GetWhere("=",cNumCbt))
-     ? cActual,oDp:cSql
+//     ? cActual,oDp:cSql
    ENDIF
 
    IF cEstado="A"

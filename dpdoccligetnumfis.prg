@@ -84,7 +84,7 @@ PROCE MAIN(cCodSuc,cSerie,cTipDoc,cNumDoc)
    cWhere           :="DCN_CODSUC"+GetWhere("=",cCodSuc)
    oDp:cDocFisEstado:=""
 
-   IF !"LIBRE"$cImpFis
+   IF !"LIBRE"$oDp:cImpFiscal 
      cWhere:=cWhere+" AND DCN_TIPDOC"+GetWhere("=",cTipDoc)
    ENDIF
 

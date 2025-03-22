@@ -19,9 +19,12 @@ PROCE MAIN(cCodCli,oCodigo,cMemo,oCliNombre)
   LOCAL oFontB :=NIL
   LOCAL oBar
   LOCAL cTitle :="Editar RIF y Nombre del Cliente",lCodCli
+  LOCAL oDb    :=OpenOdbc(oDp:cDsnData)
+  LOCAL cSql   :=" SET FOREIGN_KEY_CHECKS = 0"
 
-  DEFAULT cCodCli:="0009460028",;
-          cMemo  :=MEMOREAD("DP\VALIDARRIF.TXT")
+  DEFAULT cCodCli:="0009460028"
+
+  cMemo  :=MEMOREAD("DP\VALIDARRIF.TXT")
 
   IF !Empty(oDp:cRifErr)
      cMemo:=cMemo+CRLF+"Incidencia detectada:"+CRLF+oDp:cRifErr
@@ -63,7 +66,23 @@ PROCE MAIN(cCodCli,oCodigo,cMemo,oCliNombre)
   ACTIVATE DIALOG oDlg CENTERED;
            ON INIT DLGBAR()
 
+  IF lResp
+
+     oDb:Execute(cSql)
+
+     EJECUTAR("CREATERECORD","DPCLIENTES",{"CLI_RIF","CLI_NOMBRE","CLI_CODIGO","CLI_SITUAC","CLI_LISTA"},; 
+                                          {cRif     ,cNombreCli  ,cCodCli     ,"Activo"    ,oDp:cLista },;
+                                           NIL,.T.,cWhere)
+
+     cSql:=" SET FOREIGN_KEY_CHECKS = 1"
+
+     oDb:Execute(cSql)
+
+  ENDIF
+
   IF lResp .AND. ValType(oCodigo)="O"
+
+
 
      cCodCli:=SQLGET("DPCLIENTES","CLI_CODIGO,CLI_CODVEN","CLI_RIF"+GetWhere("=",cRif))
 
@@ -112,8 +131,6 @@ FUNCTION DLGBAR()
           ACTION REG_VALRIF() CANCEL
 
    oBtn:cToolTip:="Validar RIF en el Portal del SENIAT"
-
-
 
    DEFINE BUTTON oBtn;
           OF oBar;
@@ -181,8 +198,8 @@ RETURN lResp
 
 FUNCTION VALIDARIF()
   LOCAL cWhere:=NIL
-  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
-  LOCAL cSql  :=" SET FOREIGN_KEY_CHECKS = 0"
+//  LOCAL oDb   :=OpenOdbc(oDp:cDsnData)
+//  LOCAL cSql  :=" SET FOREIGN_KEY_CHECKS = 0"
 
   // RIF=CODIGO
   IF lCodCli
@@ -203,7 +220,7 @@ FUNCTION VALIDARIF()
     ENDIF
 
   ENDIF
-
+/*
   oDb:Execute(cSql)
 
   EJECUTAR("CREATERECORD","DPCLIENTES",{"CLI_RIF","CLI_NOMBRE","CLI_CODIGO","CLI_SITUAC"},; 
@@ -213,6 +230,7 @@ FUNCTION VALIDARIF()
   cSql:=" SET FOREIGN_KEY_CHECKS = 1"
 
   oDb:Execute(cSql)
+*/
 
 RETURN .T.
 

@@ -15,20 +15,27 @@ FUNCTION MAIN(oDoc,lSave)
 
   DEFAULT lSave:=.F.
 
-  oDoc:DOC_USUARI:=oDp:cUsuario
+  oDoc:DOC_USUARI:="INC" //  27/02/2025 oDp:cUsuario
 
   AADD(aControls,oDoc:oDOC_CODIGO)
   AADD(aControls,oDoc:oDOC_FECHA )
   AADD(aControls,oDoc:oDOC_CODVEN)
   AADD(aControls,oDoc:oDOC_NUMERO)
 
-? GETPROCE(),"PREGABAR"
-
+  //? GETPROCE(),"PREGABAR"
   // Incluir
+
   IF !oDoc:lSaved .AND. oDoc:nOption=1
 
-? "AQUI DEBE GENERAR EL NUMERO DE LA FACTURA",oDoc:DOC_NUMERO
+//? oDoc:DOC_TIPDOC,NIL,oDoc,oDoc:DOC_CODSUC,oDoc:DOC_SERFIS,"oDoc:DOC_TIPDOC,NIL,oDoc,oDoc:DOC_CODSUC,oDoc:DOC_SERFIS"
 
+     oDoc:DOC_NUMERO:=EJECUTAR("DPDOCCLIGETNUM",oDoc:DOC_TIPDOC,NIL,oDoc,oDoc:DOC_CODSUC,oDoc:DOC_SERFIS)
+
+
+// cTipDoc,cWhere,oDoc,cCodSuc,cLetra
+// ? "AQUI DEBE GENERAR EL NUMERO DE LA FACTURA",oDoc:DOC_NUMERO," DE DONDE SALIO EL NUMERO" 
+
+/*
     WHILE AllDigit(oDoc:DOC_NUMERO) 
 
       // JN 15/05/2023, requier actualizar uso de DLL
@@ -51,7 +58,7 @@ FUNCTION MAIN(oDoc,lSave)
 ? "AQUI ASIGNA EL NUMERO"
 
     ENDDO
-
+*/
 
   ENDIF
 

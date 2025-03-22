@@ -8,8 +8,8 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis)
-   LOCAL cWhere,bBlq,oRep,cJson:="",cResp:=""
+PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis,cCodCli)
+   LOCAL cWhere,bBlq,oRep,cJson:="",cResp:="",cKey:="",cTipTra:="D"
 
    DEFAULT oDp:cImpFiscal:=""
 
@@ -18,14 +18,15 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis)
            cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)),;
            cImpFis:=oDp:cImpFiscal
 
+   cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
+           "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
+           "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
+           "DOC_TIPTRA"+GetWhere("=","D"    )
+
    IF Empty(cSerFis)
-
-      cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
-              "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
-              "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
-              "DOC_TIPTRA"+GetWhere("=","D"    )
-
-	 cSerFis:=SQLGET("DPDOCCLI","DOC_SERFIS",cWhere)
+  
+	 cSerFis:=SQLGET("DPDOCCLI","DOC_SERFIS,DOC_CODIGO",cWhere)
+      cCodCli:=DPSQLROW(2)
 
    ENDIF
 
@@ -84,12 +85,19 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis)
       
    ENDIF
 
-   IF Empty(oDp:cImpFiscal) .OR. "NINGUNA"$UPPER(oDp:cImpFiscal)
+   IF Empty(oDp:cImpFiscal) .OR. "LIBRE"$UPPER(oDp:cImpFiscal) .OR. "NING"$UPPER(oDp:cImpFiscal) .OR. "NO-FISCAL"
 
       cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
               "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
               "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
               "DOC_TIPTRA"+GetWhere("=","D"    )
+
+  
+      IF "CNTGRT"$GETLLAVE_DATA("LIC_CODIGO") .AND. !oDp:cCodEmp="0000"
+         oDp:lCrystalDesign:=.F. // apaga crystal desing
+         MsgMemo("Licencia Contable no está Autorizada para Emitir factura")
+         RETURN .F.
+      ENDIF
 
       IF !Empty(cNumero)
 
@@ -109,7 +117,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis)
 
       oDp:oGenRep:aCargo:=cTipDoc
 
-      bBlq:=[SQLUPDATE("DPDOCCLI","DOC_IMPRES",.T.,"]+cWhere+[")]
+      // bBlq:=[SQLUPDATE("DPDOCCLI","DOC_IMPRES",.T.,"]+cWhere+[")] 25/02/2025
+
+      cKey:=cCodSuc+","+cTipDoc+","+cNumero+","+cTipTra
+
+      bBlq:=[IMPRIMIRDOCCLI("]+cWhere+[","]+cKey+[")]
 
       oDp:oGenRep:bPostRun:=BLOQUECOD(bBlq) 
 
@@ -132,7 +144,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cSerFis,cImpFis)
       RETURN .T.
    ENDIF
 
-   IF "TFHK_DLL"=ALLTRIM(UPPE(oDp:cImpFiscal))
+   IF "TFHK_DLL"$ALLTRIM(UPPE(oDp:cImpFiscal))
       EJECUTAR("DLL_TFH",cCodSuc,cTipDoc,cNumero)
       RETURN .T.
    ENDIF

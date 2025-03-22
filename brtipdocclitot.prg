@@ -90,6 +90,9 @@ PROCE MAIN(cWhere,cCodSuc,nPeriodo,dDesde,dHasta,cTitle)
 
    ENDIF
 
+// ViewArray(aData)
+// return 
+
    aFields:=ACLONE(oDp:aFields) // genera los campos Virtuales
 
    IF Empty(aData)

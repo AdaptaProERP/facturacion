@@ -167,67 +167,18 @@ PROCE MAIN(oDoc)
       EJECUTAR("EPSONDOCNUM",oDocCli)
    */
 
-   /*
-
-      cNumero:=EJECUTAR("EPSONPF-NUM",oDocCli:nPar_CxC=1)
-
-      cLetra:=ALLTRIM(SQLGET("DPEQUIPOSPOS","EPV_SERIEF,EPV_NUMERO","EPV_IP"    +GetWhere("=",oDp:cPcName)+" AND "+;
-                                                                    "EPV_TIPDOC"+GetWhere("=",cTipDoc )))
-
-      // Cada PC posee su Impresora   
-      IF !Empty(cLetra)
-          cNumero:=cLetra+STRZERO(VAL(cNumero)+1,9)
-      ELSE
-          cNumero:=STRZERO(VAL(cNumero)+1,10)
-      ENDIF
-
-//? cNumero,cLetra,"IMPRESORA FISCAL"
-
-      IF Empty(cNumero)
-         RETURN .F.
-      ENDIF
-
-      oData:=DATASET("SUC_V"+oDp:cSucursal,"ALL")
-      oData:Set(oDoc:cTipDoc+"Numero",cNumero)
-      oData:Set(oDoc:cTipDoc+"NumFis",cNumero)
-      oData:Save(.T.)
-      oData:End()
-
-      oDocCli:oDOC_NUMERO:VarPut(cNumero,.T.)
-*/
+    // 28/02/2025
+/*
+    IF .F.
       // Numeración fiscal
       cLetra:=SQLGET("DPTIPDOCCLI","TDC_SERIEF","TDC_TIPO"+GetWhere("=",oDoc:DOC_TIPDOC))
 
       // Numero del Documento
       EJECUTAR("DPDOCCLIGETNUM",oDoc:DOC_TIPDOC,oDoc:cScope,oDoc)
-
-//? "NUMERO FISCAL",oDoc:DOC_NUMERO
-
-/*
-// 02/11/2020 Epson genera DOC_NUMFIS 
-      IF oDoc:nEpson=0 .OR. .T.
-
-        oData:=DATASET("SUC_V"+oDp:cSucursal,"ALL")
-        cNumero:=oData:Get(oDoc:cTipDoc+"Numero",cNumero)
-        cNumFis:=oData:Get(oDoc:cTipDoc+"NumFis",cNumero)
-        oData:End()
-
-        // Caso de numeracion en caso de Serie Fiscal
-        IF cNumero>oDoc:DOC_NUMERO
-           oDoc:DOC_NUMERO:=cNumero
-        ENDIF
-
-        WHILE oDoc:nEpson=0 .AND. COUNT("DPDOCCLI",oDoc:cScope+" AND DOC_NUMERO"+GetWhere("=",oDoc:DOC_NUMERO))>0
-          oDoc:DOC_NUMERO:=DPINCREMENTAL(oDoc:DOC_NUMERO)
-          SysRefresh(.T.)
-        ENDDO
-
-        oDoc:oDOC_NUMERO:VarPut(oDoc:DOC_NUMERO,.T.)
-
-      ENDIF
+    ENDIF
 */
-
-   // ENDIF
+    cLetra:=oDoc:cLetra
+    EJECUTAR("DPDOCCLIGETNUM",oDoc:DOC_TIPDOC,NIL,oDoc,oDoc:DOC_CODSUC,cLetra)
 
   ELSE
 

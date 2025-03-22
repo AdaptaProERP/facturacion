@@ -34,6 +34,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar
            "DOC_TIPTRA"+GetWhere("=","D"    )
 
    // Obtiene los valores impositivos
+   oDp:oGenRep:=NIL
 
    EJECUTAR("DPDOCCLIIMP",cCodSuc,cTipDoc,cCodCli,cNumero,lSave,nDesc,nRecarg,nDocOtros,cOrigen,nIvaReb,cDocOrg,nAct)
 
@@ -186,6 +187,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cCodCli,cLetra,cNomDoc,cImpFis,cSerie,lEditar
       RETURN .F.
 
   ENDIF
+
+  IF ValType(oDp:oGenRep)="O"
+    oDp:oGenRep:lOnlyPreview:=.F. // No preview
+  ENDIF
+
         
 RETURN lResp
 

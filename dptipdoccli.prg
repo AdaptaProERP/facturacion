@@ -38,6 +38,7 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc,cCodSuc,cLetra)
           cLetra :=""
 
   IF COUNT("DPSERIEFISCAL","SFI_CODSUC"+GetWhere("=",cCodSuc)+[ AND SFI_ACTIVO=1 AND SFI_LETRA<>" "])=0 
+     EJECUTAR("RUNPDF","Series_Fiscales_para_Documentos_del_Cliente.pdf")
      MsgMemo("Requiere Serie fiscal")
      DPLBX("DPSERIEFISCAL.LBX")
      RETURN .T.
@@ -144,7 +145,8 @@ FUNCTION DPTIPDOCCLI(nOption,cCodigo,lRunDoc,cCodSuc,cLetra)
   AADD(oTIPDOCCLI:aLbxName,"Productos con Equivalentes y observaciones")
   AADD(oTIPDOCCLI:aLbx    ,"DPINVEQUIVOBS.LBX")
 
-
+  AADD(oTIPDOCCLI:aLbxName,"Licores con Impuesto al PVP, grados y Capacidad")
+  AADD(oTIPDOCCLI:aLbx    ,"DPINV_LICORES.LBX")
 
   cDocDes:=IF(nOption=1,cDocDes,oTIPDOCCLI:TDC_DOCDES)
 
