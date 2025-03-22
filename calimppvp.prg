@@ -9,12 +9,15 @@
 #INCLUDE "DPXBASE.CH"
 
 PROCE MAIN(oGrid)
-  LOCAL nUt    :=0
+  LOCAL nUt    :=0,nPrecio:=0
   LOCAL cTipIva:=oGrid:oInv:INV_IVA
   LOCAL nPvpOrg:=oGrid:oInv:INV_PVPORG
   LOCAL nPorPvp:=oGrid:oInv:INV_IMPPVP
   LOCAL nGrados:=oGrid:oInv:INV_GRADOS
   LOCAL nCapaci:=oGrid:oInv:INV_CAPACI
+  LOCAL nDivisa:=oGrid:oHead:DOC_VALCAM
+  
+  nDivisa:=IIF(nDivisa=0 .OR. nDivisa=1, oDp:nKpiValor, nDivisa) // Valor del Dolar
 
   IF oGrid:nUt=0
     oGrid:nUt:=EJECUTAR("CALC_UT",oGrid:MOV_FECHA) 
@@ -32,14 +35,23 @@ PROCE MAIN(oGrid)
    nCapaci:=oDp:aRow[5]
 */
 
-  oGrid:MOV_IMPOTR:=PORCEN(oGrid:oInv:INV_IMPPVP*oGrid:MOV_CANTID*oGrid:MOV_CXUND,oGrid:oInv:INV_PVPORG) 
+  nPrecio:=ROUND(oGrid:oInv:INV_PVPORG*nDivisa,2) // Precio calculado en bs
+  // Utiliza % para ser aplicado en el precio
+  IF oGrid:oInv:INV_PVPORG>0
+     oGrid:MOV_IMPOTR:=PORCEN(nPrecio*oGrid:MOV_CANTID*oGrid:MOV_CXUND,oGrid:oInv:INV_IMPPVP) 
+  ELSE
+     // sin % de Impuesto, el usuario introduce el impuesto neteado en la ficha del producto
+     oGrid:MOV_IMPOTR:=PORCEN(nPrecio*oGrid:MOV_CANTID*oGrid:MOV_CXUND)
+  ENDIF
+
+//  oGrid:MOV_IMPOTR:=PORCEN(oGrid:oInv:INV_IMPPVP*oGrid:MOV_CANTID*oGrid:MOV_CXUND,oGrid:oInv:INV_PVPORG) 
 
    IF !Empty(oDp:nImpProd) .AND. !Empty(nPorPvp) .AND. LEFT(oDoc:DOC_ZONANL,1)="N"
       nUt  :=oGrid:nUt // EJECUTAR("CALC_UT",oGrid:MOV_FECHA) 
       oGrid:MOV_PRODUC:=oGrid:MOV_CANTID*oGrid:MOV_CXUND // Unidades
       oGrid:MOV_PRODUC:=oGrid:MOV_PRODUC*nCapaci         // Litros
       oGrid:MOV_PRODUC:=((oGrid:MOV_PRODUC*nGrados)/100) // Litros según grados Alcoholicos
-	 oGrid:MOV_PRODUC:=oGrid:MOV_PRODUC*(nUt*oDp:nImpProd)
+	 oGrid:MOV_PRODUC:=oGrid:MOV_PRODUC*(nUt*oDp:nImpProd) // oDp:nImpProd ? en donde se incluye?
    ELSE
       oGrid:MOV_PRODUC:=0
    ENDIF
