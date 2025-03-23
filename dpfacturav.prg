@@ -147,6 +147,12 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      RETURN .F.
   ENDIF
 
+  IF ISDOCFISCAL(cTipDoc) .AND. COUNT("dpseriefiscal_num")=0
+     EJECUTAR("DPSERIEFISCAL",1,"",cTipDoc)
+     RETURN NIL
+  ENDIF
+
+
   // Requiere Serie Fiscal
   IF cTipDoc="FAV" .OR. cTipDoc="FAM" .OR. cTipDoc="CRE" .OR. cTipDoc="DEB" .OR. cTipDoc="TIK" .OR. cTipDoc="DEV"
      lLibVta:=.T.
@@ -333,6 +339,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   ENDIF
 
   // oDocCli:SETSCRIPT("DPFACTURAV")
+  oDocCli:lPagos :=.F.
   oDocCli:cTitle_:=cTitle
   oDocCli:lBar:=.T.
   oDocCli:SetScope(cScope)
@@ -425,10 +432,10 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
   oDocCli:cFieldUsuario:="DOC_USUARI" // 27/2/25 Necesario para el Disparador
   oDocCli:aDataPagos   :=ACLONE(aDataPagos)
   oDocCli:oBrwPag      :=NIL
+  oDocCli:oBarPago     :=NIL
   oDocCli:nMtoIGTF     :=0
   oDocCli:nTotal       :=0
   oDocCli:lImpFisPago  :=oDp:lImpFisPago
-
   oDocCli:SETOTROSDATOS()
 
 //  IF (ISRELEASE("19.07") .OR. oDp:nVersion>=6) // AutoAjuste
@@ -480,7 +487,6 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
                                           oDocCli:DOC_CODIGO,oDocCli:DOC_NUMERO,;
                                           NIL,oDocCli:DOC_CXC,oDocCli:DOC_NETO,oDocCli)}
  
-
   oDocCli:cVeces := 0    // 18-10-2008 Marlon Ramos
 
   EJECUTAR("DPDOCCLIPAR",oDocCli,cTipDoc)
@@ -491,6 +497,7 @@ PROCE MAIN(cTipDoc,cNumeroD,lView,cLetra,cCodSuc,cCenCos,cCodAlm,cCodCli,cDocOrg
      oDocCli:lPar_EditNum:=.F. // no puede modificar numero del documento
      oDocCli:lPar_Fecha  :=.F. // no puede modificar la fecha
      oDocCli:cConfirma:="CONFORME"
+     oDocCli:lPar_LibVta :=.T.
   ENDIF
 
   oDocCli:lLimite     :=.F.  // Documento con Limites
@@ -861,10 +868,11 @@ ENDIF
   oGrid:cFieldAud     :="MOV_REGAUD" // Genera Auditoria de Registros Anulados o Modificados
   oGrid:lValExi       :=.T.
   oGrid:lHScroll      :=.T.
-  oGrid:cFileEdit     :="MYFORMS\\DPDOCCLI_"+FileNoExt(cTipDoc+aExt[1])+".BRWG"
+  oGrid:cFileEdit     :="MYFORMS\DPDOCCLI_"+FileNoExt(cTipDoc+aExt[1])+".BRWG"
   oGrid:lReqPeso      :=.F.
   oGrid:cCodMon       :="" // Código de Moneda
   oGrid:nPeso         :=0  // Peso utilizado como unidad de medida
+  oGrid:nUT           :=0  // Unidad Tributaria necesario para calcular Impuesto al PVP
   oGrid:lUnd_Peso     :=.F.
   oGrid:cMedMul       :="" // 27/02/2023
 
@@ -1591,6 +1599,25 @@ ENDIF
 
   ENDIF
 
+  // Impuesto al PVP
+  IF oDefCol:MOV_IMPOTR_ACTIVO
+
+    oCol:=oGrid:AddCol("MOV_IMPOTR")
+    oCol:cTitle   :=oDefCol:MOV_IMPOTR_TITLE 
+    oCol:bWhen    :=".F."
+    oCol:bValid   :={||.T.}
+    oCol:cMsgValid:=NIL
+    oCol:cPicture :="99,999,999,999.99"
+    oCol:bPostEdit:=NIL
+    oCol:cMemoRun:=oDefCol:MOV_IMPOTR_MEMOEJ
+
+    IF !Empty(oDefCol:MOV_IMPOTR_PICTURE)
+      oCol:cPicture:=oDefCol:MOV_IMPOTR_PICTURE
+    ENDIF
+
+  ENDIF
+
+
   // Renglón Total
   oCol:=oGrid:AddCol("MOV_TOTAL")
   oCol:cTitle   :=oDefCol:MOV_TOTAL_TITLE
@@ -1598,9 +1625,9 @@ ENDIF
 //  oCol:bCalc    :={|nTotal|nTotal:=IF(oGrid:lPesado,oGRID:MOV_CXUND,oGRID:MOV_CANTID*IIF(!oGrid:lMulti,1,oGRID:MOV_CXUND))*oGRID:MOV_PRECIO,nTotal-PORCEN(nTotal,oGrid:MOV_DESCUE)}
 
   oCol:bCalc    :={|nTotal|nTotal:=IF(oGrid:lPesado,oGRID:MOV_PESO,oGRID:MOV_CANTID*IIF(!oGrid:lMulti,1,oGRID:MOV_PESO))*oGRID:MOV_PRECIO,nTotal-PORCEN(nTotal,oGrid:MOV_DESCUE)}
-  oCol:bWhen    :={||oDocCli:lPar_TotRen .OR. (ALLTRIM(oGrid:MOV_CODIGO)==[-] .AND. oGrid:MOV_DESCUE=0)}
-
-
+//oCol:bWhen    :={||oDocCli:lPar_TotRen .OR. (ALLTRIM(oGrid:MOV_CODIGO)==[-] .AND. oGrid:MOV_DESCUE=0)}
+  oCol:bWhen    :={||.F.} // no se puede modificar el total
+  
   // JN 8/11/2016 .AND. !EMPTY(oGrid:MOV_PRECIO)) .OR. (oGrid:lDcto .AND. oGrid:MOV_DESCUE=0) .OR. oGrid:lTransp .OR. oGrid:lComent}
   oCol:lTotal   :=.T.
   oCol:nWidth   :=120+IIF(oDocCli:nPar_ItemDesc>0,0,12)+0 // QUITAR 50
@@ -1634,7 +1661,8 @@ ENDIF
     ENDIF
 
     // oCol:bWhen    :={||.F.} //  oDocCli:lPar_TotRen .OR. (ALLTRIM(oGrid:MOV_CODIGO)==[-] .AND. oGrid:MOV_DESCUE=0)}
-    oCol:bWhen    :={||oDocCli:lPar_TotRenD .OR. (ALLTRIM(oGrid:MOV_CODIGO)==[-] .AND. oGrid:MOV_DESCUE=0)}
+    // oCol:bWhen    :={||oDocCli:lPar_TotRenD .OR. (ALLTRIM(oGrid:MOV_CODIGO)==[-] .AND. oGrid:MOV_DESCUE=0)}
+    oCol:bWhen    :={||.F.} // no se puede modificar el total
 
     // JN 8/11/2016 .AND. !EMPTY(oGrid:MOV_PRECIO)) .OR. (oGrid:lDcto .AND. oGrid:MOV_DESCUE=0) .OR. oGrid:lTransp .OR. oGrid:lComent}
     oCol:lTotal   :=.T.
@@ -2294,7 +2322,9 @@ FUNCTION POSTGRABAR()
  ENDIF
 */
 
- oDocCli:RECCOUNT(.T.)
+// 20/3/2025 lentitud oDocCli:RECCOUNT(.T.)
+
+ SysRefresh(.T.)
 
 RETURN EJECUTAR("DPDOCCLIPOSGRA",oDocCli)
 
@@ -2818,43 +2848,6 @@ FUNCTION LIST(cWhereEdo,cTitle2)
 
 RETURN .T.
 
-// 18-10-2008 Marlon Ramos (Consecutivo diferente para cada impresora Fiscal)
-FUNCTION CREA_CONS(cTipDoc)
-LOCAL nLen, cNumero, cWhere
-/*
- IF cTipDoc="FAV" .OR. (cTipDoc="DEV" .OR. cTipDoc="CRE")
-
-  // S+¦lo para Facturas y Devoluciones
-   IF oDocCli:nOption = 1     // Incluir
-      IF (MYSQLGET("DPEQUIPOSPOS","EPV_IP,EPV_SERIEF,EPV_NUMERO","EPV_IP"+GetWhere("=",oDp:cPcName))=oDp:cIpLocal) .AND. oDocCli:cVeces = 0
-         oDp:cTkSerie :=oDp:aRow[2]
-         oDp:cTkNumero:=oDp:aRow[3]
-
-         cWhere:="     DOC_CODSUC"+GetWhere("=",oDocCli:cCodSuc)+;
-                 " AND DOC_TIPDOC"+GetWhere("=",cTipDoc)+;
-                 " AND DOC_TIPTRA='D' "
-     
-         cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO",cWhere+" AND LEFT(DOC_NUMERO,1)"+GetWhere("=",oDp:cTkSerie))
-         IF Empty(cNumero)
-            cNumero:=oDp:cTkNumero
-         ENDIF
-         nLen:=10-LEN(ALLTRIM(oDp:cTkSerie))
-         cNumero:=RIGHT(cNumero,nLen)
-         cNumero:=ALLTRIM(oDp:cTkSerie)+STRZERO(VAL(cNumero)+1,nLen)
-         oDp:cTkNumero:=cNumero
-         oDocCli:DOC_NUMERO:=cNumero
-         oDocCli:oDOC_NUMERO:Refresh()
-         oDocCli:cVeces := oDocCli:cVeces  +1
-
-      ENDIF
-   ENDIF
-
-   RETURN .T.    // Evitar que se edite el numero  cNumero:=ALLTRIM(oDp:cTkSerie)+STRZERO(VAL(cNumero)+1,nLen)
-
- ENDIF
-*/
-RETURN .T.
-
 FUNCTION DOCCODTER()
   LOCAL lResp:=.T.
 
@@ -2890,8 +2883,6 @@ FUNCTION VALCONDIC()
      EVAL(oDocCli:oDOC_CONDIC:bAction)
      RETURN .F.
   ENDIF
-
-? "AQUI SE CONDICIONA"
 
 RETURN .T.
 
@@ -3711,7 +3702,7 @@ FUNCTION DPFACTURAV_HEAD()
   @ 0.0,43 GET oDocCli:oDOC_NUMERO VAR oDocCli:DOC_NUMERO;
            PICTURE oDocCli:cPicDoc;
            VALID CERO(oDocCli:DOC_NUMERO) .AND. EJECUTAR("DPDOCCLIVALNUM",oDocCli);
-           WHEN oDocCli:Crea_Cons(oDocCli:cTipDoc) .AND. (AccessField("DPDOCCLI","DOC_NUMERO",oDocCli:nOption);
+           WHEN (AccessField("DPDOCCLI","DOC_NUMERO",oDocCli:nOption);
                 .AND. oDocCli:lValCodCli ;
                 .AND. oDocCli:nOption!=0 .AND. oDocCli:lPar_EditNum);
            SIZE 35,10
@@ -3742,6 +3733,7 @@ FUNCTION DPFACTURAV_HEAD()
   @ 3,80 SAY oDocCli:oSAY_SUCCLI PROMPT SQLGET("DPCLIENTESSUC","SDC_NOMBRE","SDC_CODCLI"+GetWhere("=",oDocCli:DOC_CODIGO)+" AND "+;
                                                                             "SDC_CODIGO"+GetWhere("=",oDocCli:DOC_SUCCLI))
 
+
   IF oDocCli:lPar_LibVta
 
      @ 1.0,60 SAY "# Fiscal:" RIGHT
@@ -3759,9 +3751,11 @@ FUNCTION DPFACTURAV_HEAD()
      oDocCli:oDOC_VTAANT:cMsg    :="Venta Anticipada"
      oDocCli:oDOC_VTAANT:cToolTip:="Venta Anticipada"
 
+
   ENDIF
 
-  IF oDocCli:lPagos
+  // Documento fiscal 20/3/20258
+  IF oDocCli:lPagos .OR. oDocCli:lPar_LibVta
 
     @ 1.5,50 SAYREF oDocCli:oRecibo PROMPT " "+oDocCli:DOC_RECNUM
     SayAction(oDocCli:oRecibo,{||oDocCli:VERRECIBO()})
@@ -3921,7 +3915,9 @@ RETURN .T.
 // TOMAR EL NUMERO DESDE LA IMPRESORA FISCAL
 */
 FUNCTION INCIMPFIS()
-RETURN EJECUTAR("INCIMPFIS",oDocCli)
+// RETURN EJECUTAR("INCIMPFIS",oDocCli)
+ oDp:oFrameDp:SetText("VALIDA SI LA ULTIMA FACTURA ESTA IMPRESA")
+RETURN .T.
 
 /*
 // Valida Sucursal de Origen
